@@ -16,25 +16,6 @@ class tNavigatorModelParser(object):
     basepath: str полный путь к главному файлу модели (*.data)'''
     def __init__(self) -> None:
         self.basepath = None
-        # self.__basepath = os.path.normpath(basepath)
-        # self.start = None
-        # self.file_with_schedule_section = None
-        # self.file_with_start_date = None
-        # self.schedule_lines = self.find_schedule_section(basepath)
-        # if len(self.schedule_lines) == 0:
-        #     raise ScheduleNotFoundError 
-    
-    # @staticmethod
-    # def read_lines(path: str):
-    #     '''Прочитать значения из файла
-    #     path: str - путь к файлу'''
-    #     if os.path.exists(path):
-    #         with open (path, 'r') as file:
-    #             lines = file.readlines()
-    #         return lines
-    #     else:
-    #         return []
-
 
     @staticmethod
     def read_lines(path: str):
@@ -89,7 +70,7 @@ class tNavigatorModelParser(object):
                     find_include = True
                 # запоминаем встречающиеся инклюды, на случай, если секции SCHEDULE не будет в файле *.DATA
                 if find_include and re.match(c.include_pattern, line):
-                    value = re.search(c.include_pattern, line).group()
+                    value = re.search(c.include_pattern, line).group('path')
                     inc_list.append(value)
                     find_include = False
 
@@ -107,22 +88,22 @@ class tNavigatorModelParser(object):
             # если не встретилась секция в первом фйале, то рекурсивно проходим по всеи INCLUDE, пока не встретиться секция SCHEDULE
             for inc in inc_list:
                 sch_lines = self.find_schedule_section(os.path.normpath(os.path.join(os.path.dirname(self.basepath), inc)))
-                if 'schedule_lines' in sch_lines > 0:
-                    for key in sch_lines.keys():
-                        result[key]=sch_lines[key]
-                    return result
+                if sch_lines != None:
+                    if 'schedule_lines' in sch_lines:
+                        for key in sch_lines.keys():
+                            result[key]=sch_lines[key]
+                        return result
         # если совсем ничего не найдено - возвращаем пустой список
         return None
 
     def build_model(self, basepath:str) -> tNavigatorModel:
         '''Строит модель из  SCHEDULE секции указанного в конструкторе файла
-        Возвращает класс модели tNavigatorModel'''
-
-        self.basepath = basepath
+        Возвращает класс модели tNavigatorModel
+        basepath:str - путь к файлу *.DATA'''
+        self.basepath = os.path.normpath(basepath)
         schedule = self.find_schedule_section(basepath)
         if schedule == None:
             raise ScheduleNotFoundError 
-
         kwlist = self.parse_schedule_section(schedule['schedule_lines']) 
         model = tNavigatorModel(schedule['start'], kwlist, schedule['file_with_schedule_section'])  
         return model         
