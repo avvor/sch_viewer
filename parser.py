@@ -164,7 +164,7 @@ class tNavigatorModelParser(object):
                 for file in files:
                     userfile = os.path.join(root, file)
                     lines = tNavigatorModelParser.read_lines(userfile)
-                    self.__get_keywords_list(lines, f'USER/{file}', keywords_list, use_recursion=True)
+                    self.__get_keywords_list(lines, os.path.relpath(userfile, os.path.dirname(self.basepath)), keywords_list, use_recursion=True)
         return keywords_list
     
    
