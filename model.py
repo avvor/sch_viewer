@@ -174,9 +174,9 @@ class tNavigatorModel(object):
             
             # для файла, где прописана секция SCHEDULE, нужно сохранить основное содежание файла, заменить только секцию SCHEDULE
             if file == '/' and self.__basepath != None:                
-                content = self.schedule_kw.body + content + self.end_kw.body                
+                content = self.schedule_kw.body + content  + self.end_kw.body                
                 #читаем исходный файл и находим индексы ключевых слов SCHEDULE и END 
-                with open(src_file, 'r') as file:
+                with open(src_file, 'r', encoding='utf-8') as file:
                     lines = file.readlines()
                 start_i = -1
                 end_i = -1

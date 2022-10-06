@@ -114,7 +114,8 @@ months_dict = {
     'OCT' : 10,
     'NOV' : 11,
     'DEC' : 12
-}
+} 
+
 
 date_pattern = r"(?i)^\s*(?P<day>\d{1,2})\s*('?(?P<month>[A-Z]{3})'?)\s*(?P<year>\d{4})(\s+(?P<time>\d{2}:\d{2}:\d{2}([.]\d{4})?))?\s*/"
 include_pattern = r"^\s*'(?P<path>.+)'\s*\/"

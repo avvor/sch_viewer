@@ -123,6 +123,7 @@ class INCLUDE(tNavigatorKeyword):
             print(f'В тексте ключевого слова {self.name} ошибка\n{self}')
             return None
 
+
 '''Класс TSTEP(tNavigatorKeyword): Описывает ключевое слово TSTEP'''
 class TSTEP(tNavigatorKeyword):
     def __init__(self, name='TSTEP', include_path='') -> None:

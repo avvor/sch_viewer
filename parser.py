@@ -1,7 +1,7 @@
 from datetime import datetime
 import re
 import os
-
+import chardet
 from model import *
 import constants as c
 
@@ -36,6 +36,31 @@ class tNavigatorModelParser(object):
             with open (path, 'r') as file:
                 lines = file.readlines()
             return lines
+        else:
+            return []
+
+
+    @staticmethod
+    def read_lines(path: str):
+        '''Прочитать значения из файла
+        path: str - путь к файлу'''
+        if os.path.exists(path):
+            try:
+                with open (path, 'r',  encoding='utf-8') as file:
+                    lines = file.readlines()
+                return lines
+            except UnicodeDecodeError:
+                # открываем и пересохраняем файл
+                print(f'Возникла UnicodeDecodeError файл {path} пробуем пересохранить и считать еще раз')
+                with open (path, 'rb') as file:
+                    dytes_data = file.read()
+                    meta = chardet.detect(dytes_data)
+                    data = dytes_data.decode(meta['encoding']).replace('\r\n','\n')
+
+                with open(path, 'w', encoding='utf-8') as file:
+                    file.write(data)
+
+                return tNavigatorModelParser.read_lines(path)
         else:
             return []
         
@@ -133,6 +158,13 @@ class tNavigatorModelParser(object):
         '''Парсинг SCHEDULE секции. Возвращает список объектов ключевых слов lisf of tNavigatorKeyword'''
         keywords_list = []
         self.__get_keywords_list(self.schedule_lines, '/', keywords_list)
+        userpath = os.path.join(os.path.dirname(self.basepath), 'user')
+        if os.path.exists(userpath):
+            for root, dirs, files in os.walk(userpath):  
+                for file in files:
+                    userfile = os.path.join(root, file)
+                    lines = tNavigatorModelParser.read_lines(userfile)
+                    self.__get_keywords_list(lines, f'user/{file}', keywords_list, use_recursion=True)
         return keywords_list
     
    
