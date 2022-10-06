@@ -14,30 +14,26 @@ class ScheduleNotFoundError(Exception):
 class tNavigatorModelParser(object):
     '''Класс tNavigatorModelParser: Позволяет парсить данные их файлов ГДМ
     basepath: str полный путь к главному файлу модели (*.data)'''
-    def __init__(self, basepath:str) -> None:
-        self.__basepath = os.path.normpath(basepath)
-        self.start = None
-        self.file_with_schedule_section = None
-        self.file_with_start_date = None
-        self.schedule_lines = self.find_schedule_section(basepath)
-        if len(self.schedule_lines) == 0:
-            raise ScheduleNotFoundError 
-
-    @property   
-    def basepath(self):
-        '''Путь к гдавному файлу модели'''
-        return self.__basepath
+    def __init__(self) -> None:
+        self.basepath = None
+        # self.__basepath = os.path.normpath(basepath)
+        # self.start = None
+        # self.file_with_schedule_section = None
+        # self.file_with_start_date = None
+        # self.schedule_lines = self.find_schedule_section(basepath)
+        # if len(self.schedule_lines) == 0:
+        #     raise ScheduleNotFoundError 
     
-    @staticmethod
-    def read_lines(path: str):
-        '''Прочитать значения из файла
-        path: str - путь к файлу'''
-        if os.path.exists(path):
-            with open (path, 'r') as file:
-                lines = file.readlines()
-            return lines
-        else:
-            return []
+    # @staticmethod
+    # def read_lines(path: str):
+    #     '''Прочитать значения из файла
+    #     path: str - путь к файлу'''
+    #     if os.path.exists(path):
+    #         with open (path, 'r') as file:
+    #             lines = file.readlines()
+    #         return lines
+    #     else:
+    #         return []
 
 
     @staticmethod
@@ -64,10 +60,11 @@ class tNavigatorModelParser(object):
         else:
             return []
         
-    def find_schedule_section(self, path: str) -> list:
+    def find_schedule_section(self, path: str):
         '''Рекурсивный поиск секции SCHEDULE. Возвращает набор строк секции 
         (используется для определения стартовой даты и файла, в котором начинается секция SCHEDULE)
         path: str - путь к файлу, в котором осуществляется поиск'''
+        result = dict()
         lines = tNavigatorModelParser.read_lines(path)
         if len(lines) > 0:
             find_start = False
@@ -80,11 +77,11 @@ class tNavigatorModelParser(object):
                 if re.match(r"(?i)(^\s*START)|(^\s*RESTARTDATE)", line):
                     find_start = True                
                 if find_start and re.match(c.date_pattern, line):
-                    self.file_with_start_date = path
                     start = re.search(c.date_pattern, line)
-                    self.start = datetime(int(start.group('year')), 
-                                 c.months_dict[start.group('month').upper()], 
-                                 int(start.group('day')))
+                    result['start'] = datetime(int(start.group('year')), 
+                                        c.months_dict[start.group('month').upper()], 
+                                        int(start.group('day')))
+                    result['file_with_start_date'] = path
                     find_start = False
                 
                 # ищем секцию SCHEDULE, она одна, но может быть как в первом файле, так и в INCLUDE любой вложенности (НО ТОЛЬКО ОДИН РАЗ)
@@ -102,23 +99,32 @@ class tNavigatorModelParser(object):
                 # если встречаем уже встретили SCHEDULE и встречает END, то запоминаем индекс строки    
                 if re.match(r"(?i)^\s*END", line) and start_i >=0: end_i = i
                 
-                if start_i>=0:
-                    self.file_with_schedule_section = path
-                    return lines[start_i:] if end_i<0 else lines[start_i:end_i+1] 
+            if start_i>=0:
+                    result['file_with_schedule_section'] = path
+                    result['schedule_lines'] = lines[start_i:] if end_i<0 else lines[start_i:end_i+1] 
+                    return result    
 
             # если не встретилась секция в первом фйале, то рекурсивно проходим по всеи INCLUDE, пока не встретиться секция SCHEDULE
             for inc in inc_list:
                 sch_lines = self.find_schedule_section(os.path.normpath(os.path.join(os.path.dirname(self.basepath), inc)))
-                if len(sch_lines) > 0:
-                    return sch_lines
+                if 'schedule_lines' in sch_lines > 0:
+                    for key in sch_lines.keys():
+                        result[key]=sch_lines[key]
+                    return result
         # если совсем ничего не найдено - возвращаем пустой список
-        return []
+        return None
 
-    def build_model(self) -> tNavigatorModel:
+    def build_model(self, basepath:str) -> tNavigatorModel:
         '''Строит модель из  SCHEDULE секции указанного в конструкторе файла
         Возвращает класс модели tNavigatorModel'''
-        kwlist = self.parse_schedule_section() 
-        model = tNavigatorModel(self.start, kwlist, self.file_with_schedule_section)  
+
+        self.basepath = basepath
+        schedule = self.find_schedule_section(basepath)
+        if schedule == None:
+            raise ScheduleNotFoundError 
+
+        kwlist = self.parse_schedule_section(schedule['schedule_lines']) 
+        model = tNavigatorModel(schedule['start'], kwlist, schedule['file_with_schedule_section'])  
         return model         
     
 
@@ -154,10 +160,10 @@ class tNavigatorModelParser(object):
                     lines = tNavigatorModelParser.read_lines(inc_path)
                     self.__get_keywords_list(lines, value, keywords_list, index+1)
 
-    def parse_schedule_section(self):
+    def parse_schedule_section(self, schedule_lines):
         '''Парсинг SCHEDULE секции. Возвращает список объектов ключевых слов lisf of tNavigatorKeyword'''
         keywords_list = []
-        self.__get_keywords_list(self.schedule_lines, '/', keywords_list)
+        self.__get_keywords_list(schedule_lines, '/', keywords_list)
         userpath = os.path.join(os.path.dirname(self.basepath), 'USER')
         if os.path.exists(userpath):
             for root, dirs, files in os.walk(userpath):  
