@@ -184,6 +184,10 @@ class WEFAC(tNavigatorKeyword):
                 list.append(search.groupdict())
         return pandas.DataFrame.from_dict(list)
 
+class WCONPROD(tNavigatorKeyword):
+    pass
+
+
 
 if __name__ == '__main__':
     print(tNavigatorKeyword.__doc__)    

@@ -143,7 +143,7 @@ class tNavigatorModel(object):
         else: return []
                
     def __str__(self):
-        return f"Кол-во: {len(self.schedule_data)}; START: {self.start}"
+        return f"START: {self.start}\nКол-во дат: {len(self.schedule_data)}\nКол-во ключевых слов: {len(self.find_keywords())}"
 
     
 
