@@ -145,13 +145,21 @@ class tNavigatorModelParser(object):
         '''Парсинг SCHEDULE секции. Возвращает список объектов ключевых слов lisf of tNavigatorKeyword'''
         keywords_list = []
         self.__get_keywords_list(schedule_lines, '/', keywords_list)
-        userpath = os.path.join(os.path.dirname(self.basepath), 'USER')
+        basedir = os.path.dirname(self.basepath)
+        modelname = os.path.splitext(os.path.basename(self.basepath))[0]
+        userpath = os.path.join(basedir, 'USER')
         if os.path.exists(userpath):
-            for root, dirs, files in os.walk(userpath):  
-                for file in files:
-                    userfile = os.path.join(root, file)
+            # for root, dirs, files in os.walk(userpath):  
+            #     for file in files:
+            #         userfile = os.path.join(root, file)
+            #         lines = tNavigatorModelParser.read_lines(userfile)
+            #         self.__get_keywords_list(lines, os.path.relpath(userfile, os.path.dirname(self.basepath)), keywords_list, use_recursion=True)
+            
+            for item in os.listdir(userpath):
+                userfile = os.path.join(userpath, item)
+                if os.path.isfile(userfile) and item.startswith(f'{modelname}_'): 
                     lines = tNavigatorModelParser.read_lines(userfile)
-                    self.__get_keywords_list(lines, os.path.relpath(userfile, os.path.dirname(self.basepath)), keywords_list, use_recursion=True)
+                    self.__get_keywords_list(lines, os.path.relpath(userfile, basedir), keywords_list, use_recursion=True)   
         return keywords_list
     
    
