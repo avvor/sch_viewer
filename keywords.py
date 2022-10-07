@@ -58,7 +58,7 @@ class tNavigatorKeyword(object):
 
     def get_body_value_lines(self) -> str:
         '''Получить нормальзованные (в одну строку) значения. Без закрывающего ключевое слово слеша'''
-        normalize  = lambda x: f"{x.replace('\n', ' ')} /"
+        normalize  = lambda x: x.replace('\n', ' ') + '/'
         lines = [normalize(line) for line in self.get_body_value_text().split('/') if line.strip() != '']
         return lines
         
@@ -79,7 +79,7 @@ class tNavigatorKeyword(object):
             if len(values) == len(lines):   
                 return pandas.DataFrame.from_dict(values)
             else:
-                print(f'Не удалось разорать значение ключевого слова {self.name}. Проверьте текст ключевого слова')
+                print(f'Не удалось разорать значение ключевого слова {self.name}\n{self}')
                 return None
         else: return None
 
