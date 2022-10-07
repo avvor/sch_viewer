@@ -1,6 +1,8 @@
 from datetime import datetime, date, time, timedelta
 import re
-import constants as c
+
+import pandas
+import constants 
 
 __version__ = '0.1'
 
@@ -45,12 +47,13 @@ class tNavigatorKeyword(object):
         text: str - текст ключевого слова, разжеленный Enter'''
         self.body = text.splitlines(keepends=True)
 
-    # def get_body_value_text(self) -> str:
-    #     '''Получить текст ключевого слова БЕЗ ключевого слова и комментариев'''
-    #     s = ''
-    #     for line in self.body[1:]:
-    #         s += line[:line.index('--')]
-    #     return s
+    def get_body_value_text(self) -> str:
+        '''Получить текст ключевого слова БЕЗ ключевого слова и комментариев'''
+        text = ''
+        for line in self.body[1:]:
+            index = line.find('--')
+            text += line if index<0 else line[:index]
+        return text
 
     def get_body_text_without_keyword(self) -> str:
         '''Получить текст ключевого слова БЕЗ ключевого слова'''
@@ -65,7 +68,7 @@ class tNavigatorKeyword(object):
     
     def get_comment(self) -> str:
         '''Получить коментарий ключевого слова. Берется только первый коментарий, сразу после ключевого слова'''
-        search = re.search(c.keyword_pattern, self.get_body_text(), re.MULTILINE)
+        search = re.search(constants.re_pattern['keyword'], self.get_body_text(), re.MULTILINE)
         return search.group('comment') if search else None
     
     # TODO is_correct не реализовано, должно быть переопределено в дочерних классах
@@ -86,12 +89,12 @@ class DATES(tNavigatorKeyword):
 
     def get_value(self) -> datetime:
         s = self.get_body_text_without_keyword()
-        dt = re.search(c.date_pattern, s, re.MULTILINE)
+        dt = re.search(constants.re_pattern[self.name], s, re.MULTILINE)
         if dt:
             day = dt.group('day')
             month = dt.group('month').upper()
             year = dt.group('year')
-            d = date(int(year), c.months_dict[month], int(day))
+            d = date(int(year), constants.months_dict[month], int(day))
             time_str = dt.group('time')
             t = time()
             if time_str != None: 
@@ -104,7 +107,7 @@ class DATES(tNavigatorKeyword):
     def set_value(self, date: datetime):
         def keys_with_value(dictionary, value, default=None):
             return [k for k, v in dictionary.items() if v == value]
-        self.set_body_text(f"DATES\n{date.day} '{keys_with_value(c.months_dict, date.month)[0]}' {date.year} /\n/\n")
+        self.set_body_text(f"DATES\n{date.day} '{keys_with_value(constants.months_dict, date.month)[0]}' {date.year} /\n/\n")
         pass
 
 '''Класс INCLUDE(tNavigatorKeyword): Описывает ключевое слово INCLUDE'''
@@ -116,7 +119,7 @@ class INCLUDE(tNavigatorKeyword):
             raise KeyError
 
     def get_value(self) -> str:
-        search = re.search(c.include_pattern, self.get_body_text(), re.MULTILINE)
+        search = re.search(constants.re_pattern[self.name], self.get_body_text(), re.MULTILINE)
         if search:
             return search.group('path')
         else:
@@ -133,7 +136,7 @@ class TSTEP(tNavigatorKeyword):
             raise KeyError
 
     def get_value(self) -> timedelta:
-        search = re.findall(c.tstep_pattern, self.get_body_text(), re.MULTILINE) 
+        search = re.findall(constants.re_pattern[self.name], self.get_body_text(), re.MULTILINE) 
         sum = 0
         for str in search:
             days = float(str[-2])
@@ -171,8 +174,16 @@ class WEFAC(tNavigatorKeyword):
         else: 
             raise KeyError
 
-    def get_value(self):
-        pass
+    def get_value(self) -> pandas.DataFrame:
+        re_template = constants.re_pattern[self.name]
+        text = self.get_body_value_text()
+        list = []
+        for line in text.split('/'):
+            search = re.search(re_template, line.replace('\n', ' ')+'/', re.MULTILINE) 
+            if search:
+                list.append(search.groupdict())
+        return pandas.DataFrame.from_dict(list)
+
 
 if __name__ == '__main__':
     print(tNavigatorKeyword.__doc__)    

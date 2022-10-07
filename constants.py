@@ -116,8 +116,10 @@ months_dict = {
     'DEC' : 12
 } 
 
-
-date_pattern = r"(?i)^\s*(?P<day>\d{1,2})\s*('?(?P<month>[A-Z]{3})'?)\s*(?P<year>\d{4})(\s+(?P<time>\d{2}:\d{2}:\d{2}([.]\d{4})?))?\s*/"
-include_pattern = r"^\s*'(?P<path>.+)'\s*\/"
-keyword_pattern = r"(?i)^\s*(?P<keyword>\w+)\s*(--(?P<comment>.*)){0,1}"
-tstep_pattern = r"((?P<n>\d+)[*])?(?P<days>(\d*[.])?\d+)"
+re_pattern = {
+    'keyword' : r"(?i)^\s*(?P<keyword>\w+)\s*(--(?P<comment>.*)){0,1}",
+    'DATES' : r"(?i)^\s*(?P<day>\d{1,2})\s*('?(?P<month>[A-Z]{3})'?)\s*(?P<year>\d{4})(\s+(?P<time>\d{2}:\d{2}:\d{2}([.]\d{4})?))?\s*/",
+    'TSTEP' : r"((?P<n>\d+)[*])?(?P<days>(\d*[.])?\d+)",
+    'INCLUDE' : r"^\s*'(?P<path>.+)'\s*\/", 
+    'WEFAC' : r"(?i)'?(?P<well>(\w|[*])+)'?\s+(?P<coef>1|0?.\d*)\s*'?(?P<use>(NO|YES)?)'?\s*/"
+}
