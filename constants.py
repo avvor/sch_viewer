@@ -1,3 +1,27 @@
+re_pattern = {
+    'keyword' : r"(?i)^\s*(?P<keyword>\w+)\s*(--(?P<comment>.*)){0,1}",
+    'DATES' : r"(?i)^\s*(?P<day>\d{1,2})\s*('?(?P<month>[A-Z]{3})'?)\s*(?P<year>\d{4})(\s+(?P<time>\d{2}:\d{2}:\d{2}([.]\d{4})?))?\s*/",
+    'TSTEP' : r"((?P<n>\d+)[*])?(?P<days>(\d*[.])?\d+)",
+    'INCLUDE' : r"^\s*'(?P<path>.+)'\s*\/", 
+    'WEFAC' : r"(?i)'?(?P<well>(\w|[*])+)'?\s+(?P<coef>1|0?.\d*)\s*'?(?P<use>(NO|YES)?)'?\s*/"
+}
+
+months_dict = {
+    'JAN' : 1,
+    'FEB' : 2,
+    'MAR' : 3,
+    'APR' : 4,
+    'MAY' : 5,
+    'JUN' : 6,
+    'JUL' : 7,
+    'JLY' : 7,
+    'AUG' : 8,
+    'SEP' : 9,
+    'OCT' : 10,
+    'NOV' : 11,
+    'DEC' : 12
+} 
+
 keywords = {'ACF', 'ACFS', 'ACTDIMS', 'ACTION', 'ACTIONG', 'ACTIONR', 'ACTIONW', 'ACTIONX', 'ACTNUM', 'ADD', 'ADDREG', 'ADDZCORN', 'ADSALNOD', 'ADSORP', 'AIM', 'AIMFRAC', 'AIMPVI', 'ALKADS', 'ALKALINE', 'ALKROCK', 'ALPHA', 
 'ALPHAD', 'ALPHAI', 'ALPHANUD', 'ALPHANUI', 'ALPHANUM', 'ALPOLADS', 'ALSURFAD', 'ALSURFST', 'AMALGAM', 'AMF', 'AMFVD', 'API', 'APIGROUP', 'APILIM', 'APIVD', 'AQANCONL', 'AQANTRC', 'AQSTREAW', 'AQUANCON', 'AQUCHWAT', 
 'AQUCON', 'AQUCT', 'AQUDIMS', 'AQUFET', 'AQUFETP', 'AQUFLUX', 'AQUNUM', 'AQUTAB', 'ASPDEPO', 'ASPFLRT', 'ASPHALTE', 'ASPLCRT', 'ASPP', 'ASPP', 'ASPPW', 'ASPREWG', 'ASPVISO', 'BDENSITY', 'BIC', 'BICS', 
@@ -100,26 +124,3 @@ keywords_without_slash_symbol = {'TUNING', 'SKIPTEST', 'SCHEDULE', 'INCLUDE', 'C
 
 keywords = {*keywords, *keywords_tNav}
 
-months_dict = {
-    'JAN' : 1,
-    'FEB' : 2,
-    'MAR' : 3,
-    'APR' : 4,
-    'MAY' : 5,
-    'JUN' : 6,
-    'JUL' : 7,
-    'JLY' : 7,
-    'AUG' : 8,
-    'SEP' : 9,
-    'OCT' : 10,
-    'NOV' : 11,
-    'DEC' : 12
-} 
-
-re_pattern = {
-    'keyword' : r"(?i)^\s*(?P<keyword>\w+)\s*(--(?P<comment>.*)){0,1}",
-    'DATES' : r"(?i)^\s*(?P<day>\d{1,2})\s*('?(?P<month>[A-Z]{3})'?)\s*(?P<year>\d{4})(\s+(?P<time>\d{2}:\d{2}:\d{2}([.]\d{4})?))?\s*/",
-    'TSTEP' : r"((?P<n>\d+)[*])?(?P<days>(\d*[.])?\d+)",
-    'INCLUDE' : r"^\s*'(?P<path>.+)'\s*\/", 
-    'WEFAC' : r"(?i)'?(?P<well>(\w|[*])+)'?\s+(?P<coef>1|0?.\d*)\s*'?(?P<use>(NO|YES)?)'?\s*/"
-}

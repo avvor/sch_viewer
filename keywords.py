@@ -1,4 +1,5 @@
 from datetime import datetime, date, time, timedelta
+from lzma import is_check_supported
 import re
 
 import pandas
@@ -55,13 +56,32 @@ class tNavigatorKeyword(object):
             text += line if index<0 else line[:index]
         return text
 
+    def get_body_value_lines(self) -> str:
+        '''Получить нормальзованные (в одну строку) значения. Без закрывающего ключевое слово слеша'''
+        normalize  = lambda x: f"{x.replace('\n', ' ')} /"
+        lines = [normalize(line) for line in self.get_body_value_text().split('/') if line.strip() != '']
+        return lines
+        
     def get_body_text_without_keyword(self) -> str:
         '''Получить текст ключевого слова БЕЗ ключевого слова'''
         return "".join(self.body[1:])
 
     def get_value(self):
         '''Получить значение ключевого слова'''
-        pass
+        if self.name in constants.re_pattern:
+            re_template = constants.re_pattern[self.name]
+            values = []
+            lines = self.get_body_value_lines()
+            for line in lines:
+                search = re.search(re_template, line.replace('\n', ' ')+'/', re.MULTILINE) 
+                if search:
+                    values.append(search.groupdict())
+            if len(values) == len(lines):   
+                return pandas.DataFrame.from_dict(values)
+            else:
+                print(f'Не удалось разорать значение ключевого слова {self.name}. Проверьте текст ключевого слова')
+                return None
+        else: return None
 
     def __str__(self) -> str:
         return f"Путь к файлу: {self.include_path}\nТекст кочевого слова:\n{self.get_body_text()}"
@@ -77,7 +97,10 @@ class tNavigatorKeyword(object):
         # 1. начинается c ключевого слова и это ключевое слово == self.name
         # 2. каждое значение заканчивается символом /
         # 3. ключевое слово заканчивается символом / (за исключением тех, что в списке keywords_without_slash_symbol)
-        return len(self.body)>0
+        if len(self.body)>0:
+            if re.match(rf"(?i)^\s*{self.name}\s*", self.body[0]):
+                return True
+        return False
 
 class DATES(tNavigatorKeyword):
     '''Класс DATES(tNavigatorKeyword): Описывает ключевое слово DATES'''
@@ -151,41 +174,41 @@ class TSTEP(tNavigatorKeyword):
 # P13 .8 /
 # I* .97 /
 # /
-class WEFAC(tNavigatorKeyword):
-    def __init__(self, name = 'WEFAC', include_path='') -> None:
-        '''WEFAC(tNavigatorKeyword) - ключевое слово определяет коэффициент эксплуатации для скважин.
-Одна строка данных содержит следующие параметры:
-1. название скважины, или список скважин, заданный ключевым словом WLIST,
-2. коэффициент эксплуатации (доля времени, в течение которого скважина работает).
-Коэффициент эксплуатации скважины должен быть больше нуля, иначе он будет
-проигнорирован и взят по умолчанию;
-По умолчанию: 1.
-3. учитывать ли коэффициент эксплуатации при расчете потоков в ветвях и по-
-терь давления в расширенной сети (BRANPROP, NODEPROP):
-• YES – Потери давления в ветвях в расширенной сети рассчитываются с ис-
-пользованием среднего по времени дебита скважины (дебита, умноженного
-на коэффициент эксплуатации).
-• NO – Потери давления в ветвях в расширенной сети рассчитываются с ис-
-пользованием максимального дебита скважины (дебит не умножается на ко-
-эффициент эксплуатации);
-• По умолчанию: YES.'''
-        if name == 'WEFAC':
-            super().__init__(name, include_path)
-        else: 
-            raise KeyError
+# class WEFAC(tNavigatorKeyword):
+#     def __init__(self, name = 'WEFAC', include_path='') -> None:
+#         '''WEFAC(tNavigatorKeyword) - ключевое слово определяет коэффициент эксплуатации для скважин.
+# Одна строка данных содержит следующие параметры:
+# 1. название скважины, или список скважин, заданный ключевым словом WLIST,
+# 2. коэффициент эксплуатации (доля времени, в течение которого скважина работает).
+# Коэффициент эксплуатации скважины должен быть больше нуля, иначе он будет
+# проигнорирован и взят по умолчанию;
+# По умолчанию: 1.
+# 3. учитывать ли коэффициент эксплуатации при расчете потоков в ветвях и по-
+# терь давления в расширенной сети (BRANPROP, NODEPROP):
+# • YES – Потери давления в ветвях в расширенной сети рассчитываются с ис-
+# пользованием среднего по времени дебита скважины (дебита, умноженного
+# на коэффициент эксплуатации).
+# • NO – Потери давления в ветвях в расширенной сети рассчитываются с ис-
+# пользованием максимального дебита скважины (дебит не умножается на ко-
+# эффициент эксплуатации);
+# • По умолчанию: YES.'''
+#         if name == 'WEFAC':
+#             super().__init__(name, include_path)
+#         else: 
+#             raise KeyError
 
-    def get_value(self) -> pandas.DataFrame:
-        re_template = constants.re_pattern[self.name]
-        text = self.get_body_value_text()
-        list = []
-        for line in text.split('/'):
-            search = re.search(re_template, line.replace('\n', ' ')+'/', re.MULTILINE) 
-            if search:
-                list.append(search.groupdict())
-        return pandas.DataFrame.from_dict(list)
+#     def get_value(self) -> pandas.DataFrame:
+#         re_template = constants.re_pattern[self.name]
+#         text = self.get_body_value_text()
+#         list = []
+#         for line in text.split('/'):
+#             search = re.search(re_template, line.replace('\n', ' ')+'/', re.MULTILINE) 
+#             if search:
+#                 list.append(search.groupdict())
+#         return pandas.DataFrame.from_dict(list)
 
-class WCONPROD(tNavigatorKeyword):
-    pass
+# class WCONPROD(tNavigatorKeyword):
+#     pass
 
 
 
