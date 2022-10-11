@@ -3,7 +3,7 @@ import re
 import os
 import chardet
 from model import *
-import constants as c
+import constants
 
 __version__ = '0.1'
  
@@ -57,10 +57,10 @@ class tNavigatorModelParser(object):
                 # ищем стартовую дату (она одна, в файле с расширением *.DATA)
                 if re.match(r"(?i)(^\s*START)|(^\s*RESTARTDATE)", line):
                     find_start = True                
-                if find_start and re.match(c.date_pattern, line):
-                    start = re.search(c.date_pattern, line)
+                if find_start and re.match(constants.re_pattern['DATES'], line):
+                    start = re.search(constants.re_pattern['DATES'], line)
                     result['start'] = datetime(int(start.group('year')), 
-                                        c.months_dict[start.group('month').upper()], 
+                                        constants.months_dict[start.group('month').upper()], 
                                         int(start.group('day')))
                     result['file_with_start_date'] = path
                     find_start = False
@@ -69,8 +69,8 @@ class tNavigatorModelParser(object):
                 if re.match(r"(?i)^\s*INCLUDE", line): 
                     find_include = True
                 # запоминаем встречающиеся инклюды, на случай, если секции SCHEDULE не будет в файле *.DATA
-                if find_include and re.match(c.include_pattern, line):
-                    value = re.search(c.include_pattern, line).group('path')
+                if find_include and re.match(constants.re_pattern['INCLUDE'], line):
+                    value = re.search(constants.re_pattern['INCLUDE'], line).group('path')
                     inc_list.append(value)
                     find_include = False
 
@@ -118,10 +118,10 @@ class tNavigatorModelParser(object):
             keywords_list = []
         tNav_kw = None
         for line in lines:
-            re_kw = re.search(c.keyword_pattern, line)
+            re_kw = re.search(constants.re_pattern['keyword'], line)
             if re_kw:
                 kw = re_kw.group('keyword').upper()
-                if kw in c.keywords:
+                if kw in constants.keywords:
                     tNav_kw_class = tNavigatorModel.get_keyword_class(kw)
                     tNav_kw = tNav_kw_class(kw, path)
                     # keywords_list.append(tNav_kw)
@@ -145,13 +145,15 @@ class tNavigatorModelParser(object):
         '''Парсинг SCHEDULE секции. Возвращает список объектов ключевых слов lisf of tNavigatorKeyword'''
         keywords_list = []
         self.__get_keywords_list(schedule_lines, '/', keywords_list)
-        userpath = os.path.join(os.path.dirname(self.basepath), 'USER')
-        if os.path.exists(userpath):
-            for root, dirs, files in os.walk(userpath):  
-                for file in files:
-                    userfile = os.path.join(root, file)
+        basedir = os.path.dirname(self.basepath)
+        modelname = os.path.splitext(os.path.basename(self.basepath))[0]
+        userpath = os.path.join(basedir, 'USER')
+        if os.path.exists(userpath):            
+            for item in os.listdir(userpath):
+                userfile = os.path.join(userpath, item)
+                if os.path.isfile(userfile) and item.startswith(f'{modelname}_'): 
                     lines = tNavigatorModelParser.read_lines(userfile)
-                    self.__get_keywords_list(lines, os.path.relpath(userfile, os.path.dirname(self.basepath)), keywords_list, use_recursion=True)
+                    self.__get_keywords_list(lines, os.path.relpath(userfile, basedir), keywords_list, use_recursion=True)   
         return keywords_list
     
    

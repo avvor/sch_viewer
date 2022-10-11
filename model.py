@@ -1,7 +1,6 @@
 from datetime import datetime
 import os
 import shutil
-from xml.etree.ElementInclude import include
 from keywords import *
 import pandas as pd
 
@@ -124,24 +123,27 @@ class tNavigatorModel(object):
             return deleted
 
             
-    def find_keywords(self, date: datetime, keyword: str = None, comment: str = None) -> list:
-        '''Найти ключевые слова по заданным параметрам
-        date: datetime - дата
+    def find_keywords(self, date: datetime = None, keyword: str = None, comment: str = None) -> list:
+        '''Найти ключевые слова по заданным параметрам (вызов без параметров вернет ВСЕ ключевые слова списком)
+        date: datetime = None - дата
         keyword: str = None - название ключевого слова
         comment: str = None - коментарий ключевого слова (без --)'''
-        if date in self.schedule_data:
-            keywords = self.schedule_data[date] 
+        def find(keywords, keyword, comment):
             if keyword == None and comment == None:
                 return keywords
             else:
                 return [x for x in keywords if (keyword == None or x.name == keyword) and (comment == None or x.get_comment() == comment)] 
-        else: 
-            return []
+        if date == None:
+            keywords=[]
+            for date, kw in sorted(self.schedule_data.items()): 
+                keywords = keywords + find(kw, keyword, comment)
+            return keywords
+        elif date in self.schedule_data:
+            return find(self.schedule_data[date], keyword, comment)
+        else: return []
                
-
-
     def __str__(self):
-        return f"Кол-во: {len(self.schedule_data)}; START: {self.start}"
+        return f"START: {self.start}\nКол-во дат: {len(self.schedule_data)}\nКол-во ключевых слов: {len(self.find_keywords())}"
 
     
 
@@ -151,8 +153,8 @@ class tNavigatorModel(object):
         makebackup: bool=False - сохранять копии старых файлов (к исходным файлам будет дописано расширение .back)'''
         files = dict() # {имя файла: содержание файла}
         inc_path = ''
-        for date, ketwords in sorted(self.schedule_data.items()): 
-            for kw in ketwords:          
+        for date, keywords in sorted(self.schedule_data.items()): 
+            for kw in keywords:          
                 if kw.include_path not in files:
                     files[kw.include_path] = []
                 files[kw.include_path] += kw.body 
