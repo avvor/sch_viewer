@@ -15,8 +15,16 @@ class tNavigatorKeyword(object):
         self.__name = name.upper()
         self.__include_path = include_path if include_path != None else ''
         self.body = []
+        self.__immutable = False
 
-  
+    @property
+    def immutable(self):
+        return self.__immutable
+    
+    @immutable.setter
+    def immutable(self, value):
+        self.__immutable=value
+
     @property
     def name(self):
         '''Ключевое слово'''
@@ -46,7 +54,10 @@ class tNavigatorKeyword(object):
     def set_body_text(self, text: str):
         '''Установить текст ключевого слова
         text: str - текст ключевого слова, разжеленный Enter'''
-        self.body = text.splitlines(keepends=True)
+        if not self.immutable:
+            self.body = text.splitlines(keepends=True)
+        else:
+            print(f'Ключевое слово {self.name} не было изменено, так как находился в файле, на который несколько ссылок')
 
     def get_body_value_text(self) -> str:
         '''Получить текст ключевого слова БЕЗ ключевого слова и комментариев'''
@@ -149,6 +160,16 @@ class INCLUDE(tNavigatorKeyword):
             print(f'В тексте ключевого слова {self.name} ошибка\n{self}')
             return None
 
+    def set_value(self, path) -> str:
+        text = self.get_body_text()
+        search = re.search(constants.re_pattern[self.name], text, re.MULTILINE)
+        if search:
+            text = text.replace(search.group('path'), path)
+            self.set_body_text(text)
+        else:
+            print(f'В тексте ключевого слова {self.name} ошибка, значение не изменено\n{self}')
+
+
 
 '''Класс TSTEP(tNavigatorKeyword): Описывает ключевое слово TSTEP'''
 class TSTEP(tNavigatorKeyword):
@@ -166,51 +187,6 @@ class TSTEP(tNavigatorKeyword):
             n = 1 if (str[-3] == '') else int(str[-3])
             sum += days*n
         return timedelta(sum)
-
-# TODO реализовать WEFAC
-# WEFAC
-# P25 .89 NO /
-# P12 .7 /
-# P13 .8 /
-# I* .97 /
-# /
-# class WEFAC(tNavigatorKeyword):
-#     def __init__(self, name = 'WEFAC', include_path='') -> None:
-#         '''WEFAC(tNavigatorKeyword) - ключевое слово определяет коэффициент эксплуатации для скважин.
-# Одна строка данных содержит следующие параметры:
-# 1. название скважины, или список скважин, заданный ключевым словом WLIST,
-# 2. коэффициент эксплуатации (доля времени, в течение которого скважина работает).
-# Коэффициент эксплуатации скважины должен быть больше нуля, иначе он будет
-# проигнорирован и взят по умолчанию;
-# По умолчанию: 1.
-# 3. учитывать ли коэффициент эксплуатации при расчете потоков в ветвях и по-
-# терь давления в расширенной сети (BRANPROP, NODEPROP):
-# • YES – Потери давления в ветвях в расширенной сети рассчитываются с ис-
-# пользованием среднего по времени дебита скважины (дебита, умноженного
-# на коэффициент эксплуатации).
-# • NO – Потери давления в ветвях в расширенной сети рассчитываются с ис-
-# пользованием максимального дебита скважины (дебит не умножается на ко-
-# эффициент эксплуатации);
-# • По умолчанию: YES.'''
-#         if name == 'WEFAC':
-#             super().__init__(name, include_path)
-#         else: 
-#             raise KeyError
-
-#     def get_value(self) -> pandas.DataFrame:
-#         re_template = constants.re_pattern[self.name]
-#         text = self.get_body_value_text()
-#         list = []
-#         for line in text.split('/'):
-#             search = re.search(re_template, line.replace('\n', ' ')+'/', re.MULTILINE) 
-#             if search:
-#                 list.append(search.groupdict())
-#         return pandas.DataFrame.from_dict(list)
-
-# class WCONPROD(tNavigatorKeyword):
-#     pass
-
-
 
 if __name__ == '__main__':
     print(tNavigatorKeyword.__doc__)    

@@ -3,6 +3,7 @@ import os
 import shutil
 from keywords import *
 import pandas as pd
+from treelib import Node, Tree
 
 __version__ = '0.1'
 
@@ -12,10 +13,13 @@ class tNavigatorModel(object):
     start: datetime = None - стартовая дата модели. Все последующие даты должны быть больше чем она
     keywords_list: list of tNavigatorKeyword = [] - список ключевых слов, из которых собрается модель
     basepath: str = None - путь к файлу с ключевым словом SCHEDULE'''
-    def __init__(self, start: datetime = None, keywords_list: list = [], basepath:str = None) -> None:
+    def __init__(self, start: datetime = None, keywords_list: list = [], basepath: str = None) -> None:
         self.__start = start
         self.__sch_data = dict()
-        date = start 
+        self.__basepath = basepath
+        
+        # список файлов, ссылки на которые встречаются более 1 раза
+        self.immutable_files=[] 
 
         self.schedule_kw = tNavigatorKeyword('SCHEDULE')
         self.schedule_kw.add_line('SCHEDULE')
@@ -31,11 +35,12 @@ class tNavigatorModel(object):
                 if kw.name == 'DATES': 
                     date = kw.get_value()
                 # TODO спорный момент, обсудить с Сашей
+                # FIXME сделать пустые DATES при встрече с TSTEP с несколькими шагами, подумать об этом еще
                 if kw.name == 'TSTEP': 
                     date = date + kw.get_value()
                 self.add_keyword(date, kw, add_date_kw=False)
-        # self.__source_sch = self.schedule_data.copy()
-        self.__basepath = basepath
+        self.__source_sch = self.schedule_data.copy()
+        
 
     @staticmethod
     def get_keyword_class(class_name: str):
@@ -56,10 +61,10 @@ class tNavigatorModel(object):
         '''Данные SCHEDULE секции в виде словаря  { datetime : list of tNavigatorKeyword }'''    
         self.__sch_data = sch_data
 
-    # @property
-    # def source_sch(self):
-    #     '''Исходные данные SCHEDULE секции в виде словаря (неизмененная версия)'''
-    #     return self.__source_sch
+    @property
+    def source_sch(self):
+        '''Исходные данные SCHEDULE секции в виде словаря (неизмененная версия)'''
+        return self.__source_sch
         
     @property
     def start(self):
@@ -70,6 +75,11 @@ class tNavigatorModel(object):
     def start(self, start):      
         '''Стартовая дата модели'''
         self.__start = start
+
+    def add_immutable_file(self, path):
+        self.immutable_files.append(path)
+        for kw in [x for x in self.find_keywords() if x.include_path==path]:
+            kw.immutable = True
 
     def add_keyword(self, date: datetime, keyword: tNavigatorKeyword, add_date_kw: bool = True) -> tNavigatorKeyword:
         '''Добавить ОДНО ключевое слово в модель
@@ -84,11 +94,22 @@ class tNavigatorModel(object):
             if date in self.schedule_data: 
                 if keyword.include_path == '' and len(self.schedule_data[date]) > 0:
                     keyword.include_path = self.schedule_data[date][-1].include_path 
+                
+                # проверяем втречалось ли INCLUDE с таким путем, если да, то этот файл изменять нельзя
+                if keyword.name == 'INCLUDE':
+                    val=keyword.get_value()
+                    same_includes = [x for x in self.find_keywords(keyword='INCLUDE') if x.get_value()==val]
+                    n = len(same_includes)
+                    if n>0: 
+                        if val not in self.immutable_files: 
+                            self.add_immutable_file(val)
+                        print(f'{keyword.name} со ссылкой на файл {val} добавлена {n+1} раз(а)')
                 # TODO раскомментировать строки ниже если нужно выводить ЛОГ, при повторном добавлении ключевого слова в дату
-                # if keyword.name != 'INCLUDE':
+                # else:
                 #     n = len(self.find_keywords(date, keyword.name))
                 #     if n>0: 
-                #         print(f'Для даты {date} ключевое слово {keyword.name} добавлено {n+1} раз(а)') 
+                #         print(f'Для даты {date} ключевое слово {keyword.name} добавлено {n+1} раз(а)')
+                keyword.immutable = keyword.include_path in self.immutable_files
                 self.schedule_data[date].append(keyword)
             else: 
                 if keyword.include_path == '':
@@ -107,6 +128,23 @@ class tNavigatorModel(object):
         else:
             raise ValueError (f'Ключевое слово {keyword.name} не может быть добавлено в модель. Проверьте корректность значений')
 
+    def create_include_tree(self):
+        tree = Tree()
+        tree.create_node(identifier='/')
+        inc_kw = self.find_keywords(keyword='INCLUDE')
+        self.__create_include_tree(tree, inc_kw, '/')
+        return tree
+
+    def __create_include_tree(self, tree, inc_keywords, path):
+        inc_kw = [x for x in inc_keywords if x.include_path == path] 
+        for kw in inc_kw:
+            inc_value = kw.get_value()
+            if tree.get_node(inc_value)==None:
+                tree.create_node(identifier=inc_value, parent=kw.include_path, data=kw)
+            else:
+                print(f'INCLUDE со ссылкой на файл {inc_value} встречается несколько раз')
+            self.__create_include_tree(tree, inc_keywords, inc_value)
+
     def delete_keywords(self, date: datetime, keyword: str = None, comment: str = None) -> list:
         '''Удалить ключевые слова по заданным параметрам
         date: datetime - дата
@@ -117,10 +155,13 @@ class tNavigatorModel(object):
         else:
             deleted = self.find_keywords(date, keyword, comment)
             for item in deleted:
-                self.schedule_data[date].remove(item)
+                if not item.immutable:
+                    self.schedule_data[date].remove(item)
+                else:
+                    print(f'Ключевое слово {item} не было удалено, так как находится в файле на который несколько ссылок')
             if len(self.schedule_data[date]) == 0:
                 self.schedule_data.pop(date)
-            return deleted
+            return [x for x in deleted if not x.immutable]
 
             
     def find_keywords(self, date: datetime = None, keyword: str = None, comment: str = None) -> list:
@@ -145,13 +186,35 @@ class tNavigatorModel(object):
     def __str__(self):
         return f"START: {self.start}\nКол-во дат: {len(self.schedule_data)}\nКол-во ключевых слов: {len(self.find_keywords())}"
 
-    
+    def save_as(self, path:str, makebackup: bool=False):
+        inc_tree = self.create_include_tree()
+        src_files = self.__get_files(self.source_sch)
+        dest_files = self.__get_files(self.schedule_data)
+        changed_files = {}
+        for key, value in dest_files.items():
+            if key not in src_files:
+                changed_files[key] = value
+            elif dest_files[key] != value:
+                changed_files[key] = value
+        
+        return changed_files
 
-    def save_as(self, path: str, makebackup: bool=False):
+
+
+    def __get_files(self, data):
+        files = dict() # {имя файла: содержание файла}
+        for date, keywords in sorted(data.items()): 
+            for kw in keywords:          
+                if kw.include_path not in files:
+                    files[kw.include_path] = []
+                files[kw.include_path] += kw.body 
+
+    def save_as2(self, path: str, makebackup: bool=False):
         '''Сохранить модель в новом месте. Указывается только путь к файлу *.data
         path: str - путь к файлу
         makebackup: bool=False - сохранять копии старых файлов (к исходным файлам будет дописано расширение .back)'''
-        files = dict() # {имя файла: содержание файла}
+        now = datetime.now().strftime("%Y%m%d%H%M%S")
+        files = dict() # {имя файла: содержание файла}      
         inc_path = ''
         for date, keywords in sorted(self.schedule_data.items()): 
             for kw in keywords:          
@@ -167,7 +230,7 @@ class tNavigatorModel(object):
             
             # делаем бекап файла
             if makebackup and self.__basepath != None:
-                shutil.copyfile(src_file, src_file + '.back')
+                shutil.copyfile(src_file, f'{src_file}.{now}.back')
 
             output_file =  os.path.normpath(os.path.join(os.path.dirname(path), file)) if file != '/' else path
 

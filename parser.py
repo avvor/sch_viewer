@@ -16,6 +16,7 @@ class tNavigatorModelParser(object):
     basepath: str полный путь к главному файлу модели (*.data)'''
     def __init__(self) -> None:
         self.basepath = None
+        self.duplicate_links=[]
 
     @staticmethod
     def read_lines(path: str):
