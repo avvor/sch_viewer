@@ -109,8 +109,7 @@ class tNavigatorModelParser(object):
         model = tNavigatorModel(schedule['start'], kwlist, schedule['file_with_schedule_section'])  
         return model         
     
-
-    def __get_keywords_list(self, lines: list, path: str, keywords_list: list, index: int = 0, use_recursion:bool = True):
+    def __get_keywords_list(self, lines: list, path: str, abs_path:str, keywords_list: list, index: int = 0, use_recursion:bool = True):
         '''Получает список ключевых слов. При use_recursion = True Рекурсивно вызывается для секций INCLUDE
         lines: list - список строк, которые парсятся
         path: str - относительный пусть файлу, из которого эти строки ('' -  для первого файла)
@@ -132,20 +131,22 @@ class tNavigatorModelParser(object):
                 tNav_kw.add_line(line)
 
         # проходим по всем инклюдам и рекурсивно выполняем те же действия
+       
         if use_recursion:
             inc_list = [x for x in keywords_list if x.name == 'INCLUDE' and x.include_path == path]
             for inc in inc_list:
                 index = keywords_list.index(inc)
                 value = inc.get_value()
                 if value != None:
-                    inc_path = os.path.normpath(os.path.join(os.path.dirname(self.basepath), value))
+                    # inc_path = os.path.normpath(os.path.join(os.path.dirname(self.basepath), value))
+                    inc_path = os.path.normpath(os.path.join(os.path.dirname(abs_path), value))
                     lines = tNavigatorModelParser.read_lines(inc_path)
-                    self.__get_keywords_list(lines, value, keywords_list, index+1)
+                    self.__get_keywords_list(lines, value, inc_path, keywords_list, index+1)
 
     def parse_schedule_section(self, schedule_lines):
         '''Парсинг SCHEDULE секции. Возвращает список объектов ключевых слов lisf of tNavigatorKeyword'''
         keywords_list = []
-        self.__get_keywords_list(schedule_lines, '/', keywords_list)
+        self.__get_keywords_list(schedule_lines, '/', self.basepath, keywords_list, use_recursion=True)
         basedir = os.path.dirname(self.basepath)
         modelname = os.path.splitext(os.path.basename(self.basepath))[0]
         userpath = os.path.join(basedir, 'USER')
@@ -154,7 +155,7 @@ class tNavigatorModelParser(object):
                 userfile = os.path.join(userpath, item)
                 if os.path.isfile(userfile) and item.startswith(f'{modelname}_'): 
                     lines = tNavigatorModelParser.read_lines(userfile)
-                    self.__get_keywords_list(lines, os.path.relpath(userfile, basedir), keywords_list, use_recursion=True)   
+                    self.__get_keywords_list(lines, os.path.relpath(userfile, basedir), userfile, keywords_list, use_recursion=True)   
         return keywords_list
     
    
@@ -163,7 +164,7 @@ class tNavigatorModelParser(object):
         paht:str - путь к файлу из которого необходимо получить ключевые слова'''
         lines =  tNavigatorModelParser.read_lines(path)
         keywords_list = []
-        self.__get_keywords_list(lines, '', keywords_list, use_recursion=False)
+        self.__get_keywords_list(lines, '',  keywords_list, use_recursion=False)
         return keywords_list
 
 if __name__ == '__main__':

@@ -3,7 +3,7 @@ import os
 import shutil
 from keywords import *
 import pandas as pd
-from treelib import Node, Tree
+import networkx as nx
 
 __version__ = '0.1'
 
@@ -19,13 +19,14 @@ class tNavigatorModel(object):
         self.__basepath = basepath
         
         # список файлов, ссылки на которые встречаются более 1 раза
-        self.immutable_files=[] 
+        self.immutable_files={}
 
         self.schedule_kw = tNavigatorKeyword('SCHEDULE')
         self.schedule_kw.add_line('SCHEDULE')
         self.end_kw = tNavigatorKeyword('END')
         self.end_kw.add_line('END')
 
+        date = self.__start
         for kw in keywords_list:
             if kw.name == 'SCHEDULE':
                 self.schedule_kw = kw
@@ -77,7 +78,10 @@ class tNavigatorModel(object):
         self.__start = start
 
     def add_immutable_file(self, path):
-        self.immutable_files.append(path)
+        if path in self.immutable_files:
+            self.immutable_files[path]=self.immutable_files[path]+1
+        else:
+            self.immutable_files[path]=2
         for kw in [x for x in self.find_keywords() if x.include_path==path]:
             kw.immutable = True
 
@@ -101,8 +105,8 @@ class tNavigatorModel(object):
                     same_includes = [x for x in self.find_keywords(keyword='INCLUDE') if x.get_value()==val]
                     n = len(same_includes)
                     if n>0: 
-                        if val not in self.immutable_files: 
-                            self.add_immutable_file(val)
+                        self.add_immutable_file(val)
+                        # TODO раскомментировать, если нужно выводить повторяющиеся ссылки
                         print(f'{keyword.name} со ссылкой на файл {val} добавлена {n+1} раз(а)')
                 # TODO раскомментировать строки ниже если нужно выводить ЛОГ, при повторном добавлении ключевого слова в дату
                 # else:
@@ -128,23 +132,16 @@ class tNavigatorModel(object):
         else:
             raise ValueError (f'Ключевое слово {keyword.name} не может быть добавлено в модель. Проверьте корректность значений')
 
-    def create_include_tree(self):
-        tree = Tree()
-        tree.create_node(identifier='/')
-        inc_kw = self.find_keywords(keyword='INCLUDE')
-        self.__create_include_tree(tree, inc_kw, '/')
-        return tree
-
-    def __create_include_tree(self, tree, inc_keywords, path):
-        inc_kw = [x for x in inc_keywords if x.include_path == path] 
-        for kw in inc_kw:
+    def build_include_graph(self):
+        graph = nx.DiGraph()
+        inc_keywords = self.find_keywords(keyword='INCLUDE')
+        for kw in inc_keywords:
             inc_value = kw.get_value()
-            if tree.get_node(inc_value)==None:
-                tree.create_node(identifier=inc_value, parent=kw.include_path, data=kw)
-            else:
-                print(f'INCLUDE со ссылкой на файл {inc_value} встречается несколько раз')
-            self.__create_include_tree(tree, inc_keywords, inc_value)
-
+            graph.add_node(kw.include_path)
+            graph.add_node(inc_value)
+            graph.add_edge(kw.include_path, inc_value)
+        return graph
+ 
     def delete_keywords(self, date: datetime, keyword: str = None, comment: str = None) -> list:
         '''Удалить ключевые слова по заданным параметрам
         date: datetime - дата
@@ -187,7 +184,7 @@ class tNavigatorModel(object):
         return f"START: {self.start}\nКол-во дат: {len(self.schedule_data)}\nКол-во ключевых слов: {len(self.find_keywords())}"
 
     def save_as(self, path:str, makebackup: bool=False):
-        inc_tree = self.create_include_tree()
+        #inc_tree = self.build_include_tree()
         src_files = self.__get_files(self.source_sch)
         dest_files = self.__get_files(self.schedule_data)
         changed_files = {}
@@ -196,9 +193,7 @@ class tNavigatorModel(object):
                 changed_files[key] = value
             elif dest_files[key] != value:
                 changed_files[key] = value
-        
         return changed_files
-
 
 
     def __get_files(self, data):
@@ -263,7 +258,6 @@ class tNavigatorModel(object):
                         content = self.schedule_kw.body + content + self.end_kw.body
                     f.writelines(content)
 
-
     def save(self, makebackup: bool=True):
         '''Сохранить изменения в модели. Доступно только для моделей сгенерированных с помощью класса tNavigatorModelParser
         makebackup: bool=False - сохранять копии старых файлов (к исходным файлам будет дописано расширение .back)'''
@@ -277,6 +271,7 @@ class tNavigatorModel(object):
         list = []
         for key, value in sorted(self.schedule_data.items()):
             for val in value:
+                # list.append({'date': key, 'keyword': val.name, 'body': val.get_body_text(), 'include': val.include_path, 'inc_ref_count': 1})
                 list.append({'date': key, 'keyword': val.name, 'body': val.get_body_text(), 'include': val.include_path})
         return pd.DataFrame.from_dict(list)	
 

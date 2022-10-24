@@ -16,6 +16,7 @@ class tNavigatorKeyword(object):
         self.__include_path = include_path if include_path != None else ''
         self.body = []
         self.__immutable = False
+        self.__nref=1
 
     @property
     def immutable(self):
@@ -24,6 +25,14 @@ class tNavigatorKeyword(object):
     @immutable.setter
     def immutable(self, value):
         self.__immutable=value
+
+    @property
+    def nref(self):
+        return self.__nref
+    
+    @nref.setter
+    def nref(self, value):
+        self.__nref=value
 
     @property
     def name(self):
