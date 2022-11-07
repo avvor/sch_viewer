@@ -1,4 +1,5 @@
 from datetime import datetime
+from operator import ne
 import os
 import shutil
 from keywords import *
@@ -13,11 +14,12 @@ class tNavigatorModel(object):
     start: datetime = None - стартовая дата модели. Все последующие даты должны быть больше чем она
     keywords_list: list of tNavigatorKeyword = [] - список ключевых слов, из которых собрается модель
     basepath: str = None - путь к файлу с ключевым словом SCHEDULE'''
-    def __init__(self, start: datetime = None, keywords_list: list = [], basepath: str = None) -> None:
+    def __init__(self, start: datetime = None, keywords_list: list = [], basepath: str = None, schedule_path: str=None) -> None:
         self.__start = start
         self.__sch_data = dict()
         self.__basepath = basepath
-        
+        self.__schedule_path = schedule_path if schedule_path!=None else basepath
+       
         # список файлов, ссылки на которые встречаются более 1 раза
         self.immutable_files={}
 
@@ -35,13 +37,28 @@ class tNavigatorModel(object):
             else:
                 if kw.name == 'DATES': 
                     date = kw.get_value()
-                # TODO спорный момент, обсудить с Сашей
-                # FIXME сделать пустые DATES при встрече с TSTEP с несколькими шагами, подумать об этом еще
                 if kw.name == 'TSTEP': 
                     date = date + kw.get_value()
                 self.add_keyword(date, kw, add_date_kw=False)
         self.__source_sch = self.schedule_data.copy()
         
+
+    @property
+    def model_name(self):
+        if self.__basepath!=None:
+            file=os.path.basename(self.__basepath)
+            return os.path.splitext(file)[0]
+        else:
+            return None
+
+    @property
+    def model_dirname(self):
+        if self.__basepath!=None:
+            dir=os.path.dirname(self.__basepath)
+            if dir=='':
+                return os.getcwd()
+        else:
+            return os.getcwd()
 
     @staticmethod
     def get_keyword_class(class_name: str):
@@ -107,12 +124,13 @@ class tNavigatorModel(object):
                     if n>0: 
                         self.add_immutable_file(val)
                         # TODO раскомментировать, если нужно выводить повторяющиеся ссылки
-                        print(f'{keyword.name} со ссылкой на файл {val} добавлена {n+1} раз(а)')
+                        # print(f'{keyword.name} со ссылкой на файл {val} добавлена {n+1} раз(а)')
                 # TODO раскомментировать строки ниже если нужно выводить ЛОГ, при повторном добавлении ключевого слова в дату
                 # else:
                 #     n = len(self.find_keywords(date, keyword.name))
                 #     if n>0: 
                 #         print(f'Для даты {date} ключевое слово {keyword.name} добавлено {n+1} раз(а)')
+               
                 keyword.immutable = keyword.include_path in self.immutable_files
                 self.schedule_data[date].append(keyword)
             else: 
@@ -183,57 +201,60 @@ class tNavigatorModel(object):
     def __str__(self):
         return f"START: {self.start}\nКол-во дат: {len(self.schedule_data)}\nКол-во ключевых слов: {len(self.find_keywords())}"
 
-    def save_as(self, path:str, makebackup: bool=False):
-        #inc_tree = self.build_include_tree()
+
+
+    def get_changed_files(self) -> dict:
         src_files = self.__get_files(self.source_sch)
         dest_files = self.__get_files(self.schedule_data)
         changed_files = {}
+        # выбираем все файл, в которых есть изменения и пользовательские файлы (пока со старыми именами)
         for key, value in dest_files.items():
-            if key not in src_files:
-                changed_files[key] = value
-            elif dest_files[key] != value:
-                changed_files[key] = value
+            if key not in self.immutable_files:
+                if key not in src_files or key.upper().startswith('USER'):
+                # if key not in src_files:
+                    changed_files[key] = value
+                elif src_files[key] != value:
+                    changed_files[key] = value
         return changed_files
 
+    def __generate_new_file_names(self, new_mname):
+        def get_new_name(name):
+            if f.startswith('USER'):
+                return name.replace(self.model_name, new_mname)
+            else:
+                f=os.path.splitext(name)
+                new_file=f[0]+"_"+new_mname
+                if len(f)>1: 
+                    new_file+=f[1]
+                return new_file 
+        # получили файлы в которых изменялись ключевые слова
+        changed_files = self.get_changed_files()
+        # получили граф инклюдов (для дальнейшего вычисления путей)
+        inc_graph = self.build_include_graph()
+        # для всех файлов с изменениями меняем имена
+        fnames={}
+        for key in changed_files:
+            includes=sum(nx.all_simple_paths(inc_graph, '/', key), [])
+            for f in includes:
+                if f!='/' and f not in fnames:
+                    fnames[f]=get_new_name(f)
+        return fnames
 
-    def __get_files(self, data):
-        files = dict() # {имя файла: содержание файла}
-        for date, keywords in sorted(data.items()): 
-            for kw in keywords:          
-                if kw.include_path not in files:
-                    files[kw.include_path] = []
-                files[kw.include_path] += kw.body 
-
-    def save_as2(self, path: str, makebackup: bool=False):
-        '''Сохранить модель в новом месте. Указывается только путь к файлу *.data
-        path: str - путь к файлу
-        makebackup: bool=False - сохранять копии старых файлов (к исходным файлам будет дописано расширение .back)'''
+    def save_as(self, new_name:str, makebackup: bool=False):
+        # копируем модель во временную переменую 
+        temp=self.schedule_data.copy()
+        fnames=self.__generate_new_file_names(new_name)
+        # изменяем все ссылки на ключевые слова
+        inc_kw = self.find_keywords(keyword='INCLUDE')
+        for inc in inc_kw:
+            name = inc.get_value()
+            if name in fnames:
+                inc.set_value(fnames[name])
+        # получаем новые измененные файлы, именно их мы будем пересохранять
+        changed_files = self.get_changed_files()
         now = datetime.now().strftime("%Y%m%d%H%M%S")
-        files = dict() # {имя файла: содержание файла}      
-        inc_path = ''
-        for date, keywords in sorted(self.schedule_data.items()): 
-            for kw in keywords:          
-                if kw.include_path not in files:
-                    files[kw.include_path] = []
-                files[kw.include_path] += kw.body 
-                  
-
-        for file, content in files.items():
-            src_file = ''
-            if self.__basepath != None:
-                src_file = os.path.normpath(os.path.join(os.path.dirname(self.__basepath), file)) if file != '/' else self.__basepath
-            
-            # делаем бекап файла
-            if makebackup and self.__basepath != None:
-                shutil.copyfile(src_file, f'{src_file}.{now}.back')
-
-            output_file =  os.path.normpath(os.path.join(os.path.dirname(path), file)) if file != '/' else path
-
-            if not os.path.exists(os.path.dirname(output_file)):
-                os.makedirs(os.path.dirname(output_file))
-            
-            # для файла, где прописана секция SCHEDULE, нужно сохранить основное содежание файла, заменить только секцию SCHEDULE
-            if file == '/' and self.__basepath != None:                
+        for file, content in changed_files.items():
+            if file == '/':
                 content = self.schedule_kw.body + content  + self.end_kw.body                
                 #читаем исходный файл и находим индексы ключевых слов SCHEDULE и END 
                 with open(src_file, 'r', encoding='utf-8') as file:
@@ -251,12 +272,27 @@ class tNavigatorModel(object):
                     if end_i>=0 and len(lines) > end_i+1:
                         f.writelines(lines[end_i+1:])
             else:
-                # для всех остальных, или если не указан базовый файл (напимер, если модель была считана из excel)
+                src_file=os.path.join(self.model_dirname, file)
+                if makebackup:
+                    shutil.copyfile(src_file, f'{src_file}.{now}.back')
+                output_file= os.path.normpath(os.path.join(self.model_dirname, fnames[file]))
                 with open(output_file, 'w', encoding='utf-8') as f:
                     #самый первый файл, где должна быть секция schedule, дописываем ключевые слова
                     if file == '/': 
                         content = self.schedule_kw.body + content + self.end_kw.body
                     f.writelines(content)
+
+
+        self.schedule_data=temp
+
+    def __get_files(self, data):
+        files = dict() # {имя файла: содержание файла}
+        for date, keywords in sorted(data.items()): 
+            for kw in keywords:          
+                if kw.include_path not in files:
+                    files[kw.include_path] = []
+                files[kw.include_path] += kw.body 
+        return files
 
     def save(self, makebackup: bool=True):
         '''Сохранить изменения в модели. Доступно только для моделей сгенерированных с помощью класса tNavigatorModelParser
@@ -271,8 +307,11 @@ class tNavigatorModel(object):
         list = []
         for key, value in sorted(self.schedule_data.items()):
             for val in value:
-                # list.append({'date': key, 'keyword': val.name, 'body': val.get_body_text(), 'include': val.include_path, 'inc_ref_count': 1})
-                list.append({'date': key, 'keyword': val.name, 'body': val.get_body_text(), 'include': val.include_path})
+                note='неизменяемое' if val.immutable else ''
+                if len(val.get_body_text())>32767:
+                    note='ключевое слово > 32767 символов'
+                list.append({'date': key, 'keyword': val.name, 'body': val.get_body_text(), 'include': val.include_path, 'note': note})
+                # list.append({'date': key, 'keyword': val.name, 'body': val.get_body_text(), 'include': val.include_path})
         return pd.DataFrame.from_dict(list)	
 
     
@@ -300,7 +339,7 @@ class tNavigatorModel(object):
  
     def add_keywords_from_df(self, df: pd.DataFrame):
         '''Добавить ключевые слова из pandas.DataFrame
-        df: pd.DataFrame - датафреймс данными. Должен содержать колонки ['date', 'keyword', 'body', 'include']''' 
+        df: pd.DataFrame - датафреймс данными. Должен содержать колонки ['date', 'keyword', 'body', 'include', 'note']''' 
         for i, row in df.iterrows():
             tNav_kw_class = tNavigatorModel.get_keyword_class(row['keyword'])
             inc = row['include']
@@ -309,13 +348,15 @@ class tNavigatorModel(object):
             if not isinstance(body, str): body = ''
             kw = tNav_kw_class(row['keyword'], inc)
             kw.set_body_text(body)
+            # kw.immutable = row['immutable']
             self.add_keyword(row['date'].to_pydatetime(), kw)
      
 
     def read_from_excel(self, path: str, append: bool=False):
         '''Считать модель/ключевые слова из MS Excel
-        path: str - путь к файлу MS Excel. Эксель должен содержать колонки ['date', 'keyword', 'body', 'include'], а лучше быть предварительно создан с помощью этого модуля
+        path: str - путь к файлу MS Excel. Эксель должен содержать колонки ['date', 'keyword', 'body', 'include', 'note'], а лучше быть предварительно создан с помощью этого модуля
         append: bool=False -  True: добавлять считанные ключевые слова в существующую модель, False: перезаписать модель'''
+        # df = pd.read_excel(path, usecols=['date', 'keyword', 'body', 'include', 'immutable']) 
         df = pd.read_excel(path, usecols=['date', 'keyword', 'body', 'include']) 
         if append:
             self.add_keywords_from_df(df)

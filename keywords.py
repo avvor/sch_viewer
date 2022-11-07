@@ -5,7 +5,7 @@ import re
 import pandas
 import constants 
 
-__version__ = '0.1'
+__version__ = '0.1.1'
 
 class tNavigatorKeyword(object):
     '''Класс tNavigatorKeyword: Описывает одно ключевое слово  
@@ -59,6 +59,10 @@ class tNavigatorKeyword(object):
     def get_body_text(self) -> str:
         '''Получить полный текст ключевого слова'''
         return "".join(self.body)
+
+    # def get_trim_body_text(self) -> str:
+        
+    #     write(re.sub('\s+',' ',line))
 
     def set_body_text(self, text: str):
         '''Установить текст ключевого слова
