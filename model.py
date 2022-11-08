@@ -55,8 +55,7 @@ class tNavigatorModel(object):
     def model_dirname(self):
         if self.__basepath!=None:
             dir=os.path.dirname(self.__basepath)
-            if dir=='':
-                return os.getcwd()
+            return dir if dir!='' else os.getcwd()
         else:
             return os.getcwd()
 
@@ -94,11 +93,11 @@ class tNavigatorModel(object):
         '''Стартовая дата модели'''
         self.__start = start
 
-    def add_immutable_file(self, path):
+    def add_immutable_file(self, path, has_large_kw: bool=False):
         if path in self.immutable_files:
             self.immutable_files[path]=self.immutable_files[path]+1
         else:
-            self.immutable_files[path]=2
+            self.immutable_files[path]=1 if has_large_kw else 2
         for kw in [x for x in self.find_keywords() if x.include_path==path]:
             kw.immutable = True
 
@@ -201,8 +200,6 @@ class tNavigatorModel(object):
     def __str__(self):
         return f"START: {self.start}\nКол-во дат: {len(self.schedule_data)}\nКол-во ключевых слов: {len(self.find_keywords())}"
 
-
-
     def get_changed_files(self) -> dict:
         src_files = self.__get_files(self.source_sch)
         dest_files = self.__get_files(self.schedule_data)
@@ -211,19 +208,18 @@ class tNavigatorModel(object):
         for key, value in dest_files.items():
             if key not in self.immutable_files:
                 if key not in src_files or key.upper().startswith('USER'):
-                # if key not in src_files:
                     changed_files[key] = value
                 elif src_files[key] != value:
                     changed_files[key] = value
         return changed_files
 
-    def __generate_new_file_names(self, new_mname):
+    def __generate_new_file_names(self, new_name):
         def get_new_name(name):
-            if f.startswith('USER'):
-                return name.replace(self.model_name, new_mname)
+            if name.startswith('USER'):
+                return name.replace(self.model_name, new_name)
             else:
                 f=os.path.splitext(name)
-                new_file=f[0]+"_"+new_mname
+                new_file = f[0] + "_" + new_name
                 if len(f)>1: 
                     new_file+=f[1]
                 return new_file 
@@ -232,15 +228,23 @@ class tNavigatorModel(object):
         # получили граф инклюдов (для дальнейшего вычисления путей)
         inc_graph = self.build_include_graph()
         # для всех файлов с изменениями меняем имена
-        fnames={}
+        fnames = {}
         for key in changed_files:
-            includes=sum(nx.all_simple_paths(inc_graph, '/', key), [])
-            for f in includes:
-                if f!='/' and f not in fnames:
-                    fnames[f]=get_new_name(f)
+            if key.startswith('USER'):
+                fnames[key]=get_new_name(key)
+            else:
+                includes=sum(nx.all_simple_paths(inc_graph, '/', key), [])
+                for f in includes:
+                    if f!='/' and f not in fnames:
+                        fnames[f] = get_new_name(f)
         return fnames
 
     def save_as(self, new_name:str, makebackup: bool=False):
+        '''Сохранить как
+        new_name - новое имя модели (БЕЗ РАСШИРЕНИЯ)
+        makebackup - делать бекап файлов'''
+        if new_name==self.model_name:
+            raise ValueError("Нельзя сохранить модель под тем же именем")
         # копируем модель во временную переменую 
         temp=self.schedule_data.copy()
         fnames=self.__generate_new_file_names(new_name)
@@ -252,38 +256,48 @@ class tNavigatorModel(object):
                 inc.set_value(fnames[name])
         # получаем новые измененные файлы, именно их мы будем пересохранять
         changed_files = self.get_changed_files()
+        # возвращаем исходные данные в переменную
+        self.schedule_data=temp.copy()
+        #  СОХРАНЕНИЕ
         now = datetime.now().strftime("%Y%m%d%H%M%S")
         for file, content in changed_files.items():
-            if file == '/':
-                content = self.schedule_kw.body + content  + self.end_kw.body                
-                #читаем исходный файл и находим индексы ключевых слов SCHEDULE и END 
-                with open(src_file, 'r', encoding='utf-8') as file:
-                    lines = file.readlines()
-                start_i = -1
-                end_i = -1
-                for i, line in enumerate(lines):
-                    if re.match(r"(?i)^\s*SCHEDULE", line): start_i = i
-                    # если встречаем уже встретили SCHEDULE и встречает END, то запоминаем индекс строки    
-                    if re.match(r"(?i)^\s*END", line) and start_i >=0: end_i = i
-
-                with open(output_file, 'w', encoding='utf-8') as f:
-                    f.writelines(lines[:start_i])
-                    f.writelines(content)
-                    if end_i>=0 and len(lines) > end_i+1:
-                        f.writelines(lines[end_i+1:])
-            else:
+            if file != '/':
                 src_file=os.path.join(self.model_dirname, file)
                 if makebackup:
                     shutil.copyfile(src_file, f'{src_file}.{now}.back')
-                output_file= os.path.normpath(os.path.join(self.model_dirname, fnames[file]))
+                output_file = os.path.normpath(os.path.join(self.model_dirname, fnames[file]))
                 with open(output_file, 'w', encoding='utf-8') as f:
                     #самый первый файл, где должна быть секция schedule, дописываем ключевые слова
                     if file == '/': 
                         content = self.schedule_kw.body + content + self.end_kw.body
                     f.writelines(content)
 
+        src_file = self.__basepath
+        output_file = os.path.normpath(os.path.join(self.model_dirname, new_name+".DATA"))
+        if makebackup:
+               shutil.copyfile(src_file, f'{src_file}.{now}.back') 
 
-        self.schedule_data=temp
+        if '/' in changed_files:        
+            content = self.schedule_kw.body + changed_files['/'] # + self.end_kw.body                
+            #читаем исходный файл и находим индексы ключевых слов SCHEDULE и END 
+            with open(src_file, 'r', encoding='utf-8') as file:
+                lines = file.readlines()
+            start_i = -1
+            end_i = -1
+            for i, line in enumerate(lines):
+                if re.match(r"(?i)^\s*SCHEDULE", line): start_i = i
+                # если встречаем уже встретили SCHEDULE и встречает END, то запоминаем индекс строки    
+                if re.match(r"(?i)^\s*END", line) and start_i >=0: 
+                    end_i = i
+                    content = content + self.end_kw.body                
+            with open(output_file, 'w', encoding='utf-8') as f:
+                f.writelines(lines[:start_i])
+                f.writelines(content)
+                if end_i>=0 and len(lines) > end_i+1:
+                    f.writelines(lines[end_i+1:])
+        else:
+            shutil.copyfile(src_file, output_file)
+       
 
     def __get_files(self, data):
         files = dict() # {имя файла: содержание файла}
@@ -294,13 +308,13 @@ class tNavigatorModel(object):
                 files[kw.include_path] += kw.body 
         return files
 
-    def save(self, makebackup: bool=True):
-        '''Сохранить изменения в модели. Доступно только для моделей сгенерированных с помощью класса tNavigatorModelParser
-        makebackup: bool=False - сохранять копии старых файлов (к исходным файлам будет дописано расширение .back)'''
-        if self.__basepath != None:
-            self.save_as(self.__basepath, makebackup)
-        else:
-            raise FileExistsError
+    # def save(self, makebackup: bool=True):
+    #     '''Сохранить изменения в модели. Доступно только для моделей сгенерированных с помощью класса tNavigatorModelParser
+    #     makebackup: bool=False - сохранять копии старых файлов (к исходным файлам будет дописано расширение .back)'''
+    #     if self.__basepath != None:
+    #         self.save_as(self.__basepath, makebackup)
+    #     else:
+    #         raise FileExistsError
 
     def to_dataframe(self) -> pd.DataFrame:
         '''Конвертировать модель в pandas.DataFrame'''
@@ -348,7 +362,10 @@ class tNavigatorModel(object):
             if not isinstance(body, str): body = ''
             kw = tNav_kw_class(row['keyword'], inc)
             kw.set_body_text(body)
-            # kw.immutable = row['immutable']
+            note=row['note']
+            if not isinstance(note, str): note = ''
+            if note.find('32767')>-1:
+                self.add_immutable_file(inc, has_large_kw=True)
             self.add_keyword(row['date'].to_pydatetime(), kw)
      
 
@@ -357,10 +374,11 @@ class tNavigatorModel(object):
         path: str - путь к файлу MS Excel. Эксель должен содержать колонки ['date', 'keyword', 'body', 'include', 'note'], а лучше быть предварительно создан с помощью этого модуля
         append: bool=False -  True: добавлять считанные ключевые слова в существующую модель, False: перезаписать модель'''
         # df = pd.read_excel(path, usecols=['date', 'keyword', 'body', 'include', 'immutable']) 
-        df = pd.read_excel(path, usecols=['date', 'keyword', 'body', 'include']) 
+        df = pd.read_excel(path, usecols=['date', 'keyword', 'body', 'include', 'note']) 
         if append:
             self.add_keywords_from_df(df)
         else:
+            self.immutable_files.clear()
             self.from_dataframe(df)
 
 
