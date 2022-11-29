@@ -1,5 +1,5 @@
+import os
 from datetime import datetime
-from genericpath import exists
 import re
 import os
 import chardet

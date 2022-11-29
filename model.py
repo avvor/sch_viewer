@@ -1,5 +1,4 @@
 from datetime import datetime
-from operator import ne
 import os
 import shutil
 from keywords import *

@@ -1,5 +1,4 @@
 from datetime import datetime, date, time, timedelta
-from lzma import is_check_supported
 import re
 
 import pandas
