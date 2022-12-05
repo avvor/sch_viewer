@@ -4,6 +4,7 @@ import shutil
 from keywords import *
 import pandas as pd
 import networkx as nx
+import copy
 
 __version__ = '0.1'
 
@@ -39,7 +40,8 @@ class tNavigatorModel(object):
                 if kw.name == 'TSTEP': 
                     date = date + kw.get_value()
                 self.add_keyword(date, kw, add_date_kw=False)
-        self.__source_sch = self.schedule_data.copy()
+
+        self.__source_sch = copy.deepcopy(self.schedule_data)
         
 
     @property
@@ -245,7 +247,7 @@ class tNavigatorModel(object):
         if new_name==self.model_name:
             raise ValueError("Нельзя сохранить модель под тем же именем")
         # копируем модель во временную переменую 
-        temp=self.schedule_data.copy()
+        temp = copy.deepcopy(self.schedule_data)
         fnames=self.__generate_new_file_names(new_name)
         # изменяем все ссылки на ключевые слова
         inc_kw = self.find_keywords(keyword='INCLUDE')
@@ -256,7 +258,7 @@ class tNavigatorModel(object):
         # получаем новые измененные файлы, именно их мы будем пересохранять
         changed_files = self.get_changed_files()
         # возвращаем исходные данные в переменную
-        self.schedule_data=temp.copy()
+        self.schedule_data=copy.deepcopy(temp)
         #  СОХРАНЕНИЕ
         now = datetime.now().strftime("%Y%m%d%H%M%S")
         for file, content in changed_files.items():
@@ -345,6 +347,8 @@ class tNavigatorModel(object):
         df: pd.DataFrame = None - при значении None экспортируется вся модель, при других значениям экспортируется переданный df ['date', 'keyword', 'body', 'include']'''
         if df is None:
             df = self.to_dataframe()
+        if not os.path.exists(os.path.dirname(os.path.abspath(path))):
+            os.makedirs(os.path.dirname(os.path.abspath(path)))
         writer = pd.ExcelWriter(path)
         df.to_excel(writer, index=False)
         writer.save()

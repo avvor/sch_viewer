@@ -3,7 +3,7 @@ from datetime import datetime
 import re
 import os
 import chardet
-from model import *
+from tnavmodel import *
 import constants
 
 __version__ = '0.1.1'
