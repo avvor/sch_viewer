@@ -1,8 +1,7 @@
 from datetime import datetime, date, time, timedelta
 import re
-import pandas as pd
-
 import sch_viewer.tnavconstants as tnav
+import pandas as pd
 
 __version__ = '0.1.1'
 
@@ -68,6 +67,8 @@ class tNavigatorKeyword(object):
         text: str - текст ключевого слова, разжеленный Enter'''
         if not self.immutable:
             self.body = text.splitlines(keepends=True)
+            if not self.body[-1].endswith('\n'):
+                self.body[-1] += '\n'
         else:
             print(f'Ключевое слово {self.name} не было изменено, так как находился в файле, на который несколько ссылок')
 

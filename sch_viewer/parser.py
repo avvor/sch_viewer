@@ -1,9 +1,11 @@
-import os
-from datetime import datetime
-import re
-import chardet
-from sch_viewer.model import *
+from sch_viewer.model import tNavigatorModel
+from sch_viewer.keywords import *
 import sch_viewer.tnavconstants as tnav
+
+from chardet import detect
+from os import listdir
+from os.path import basename, splitext, dirname, join, normpath, exists, relpath, isfile
+
 
 __version__ = '0.1.1'
  
@@ -24,7 +26,7 @@ class tNavigatorModelParser(object):
     def read_lines(path: str):
         '''Прочитать значения из файла
         path: str - путь к файлу'''
-        if os.path.exists(path):
+        if exists(path):
             try:
                 with open (path, 'r',  encoding='utf-8') as file:
                     lines = file.readlines()
@@ -34,7 +36,7 @@ class tNavigatorModelParser(object):
                 print(f'Возникла UnicodeDecodeError файл {path} пробуем пересохранить и считать еще раз')
                 with open (path, 'rb') as file:
                     dytes_data = file.read()
-                    meta = chardet.detect(dytes_data)
+                    meta = detect(dytes_data)
                     data = dytes_data.decode(meta['encoding']).replace('\r\n','\n')
 
                 with open(path, 'w', encoding='utf-8') as file:
@@ -90,7 +92,7 @@ class tNavigatorModelParser(object):
 
             # если не встретилась секция в первом фйале, то рекурсивно проходим по всеи INCLUDE, пока не встретиться секция SCHEDULE
             for inc in inc_list:
-                sch_lines = self.find_schedule_section(os.path.normpath(os.path.join(os.path.dirname(self.basepath), inc)))
+                sch_lines = self.find_schedule_section(normpath(join(dirname(self.basepath), inc)))
                 if sch_lines != None:
                     if 'schedule_lines' in sch_lines:
                         for key in sch_lines.keys():
@@ -103,7 +105,7 @@ class tNavigatorModelParser(object):
         '''Строит модель из  SCHEDULE секции указанного в конструкторе файла
         Возвращает класс модели tNavigatorModel
         basepath:str - путь к файлу *.DATA'''
-        self.basepath = os.path.normpath(basepath)
+        self.basepath = normpath(basepath)
         schedule = self.find_schedule_section(basepath)
         self.files={}
         if schedule == None:
@@ -140,9 +142,9 @@ class tNavigatorModelParser(object):
                 index = keywords_list.index(inc)
                 value = inc.get_value()
                 if value != None:
-                    inc_path_base = os.path.normpath(os.path.join(os.path.dirname(self.basepath), value))
-                    inc_path_curdir = os.path.normpath(os.path.join(os.path.dirname(abs_path), value))
-                    inc_file = inc_path_curdir if os.path.exists(inc_path_curdir) else inc_path_base
+                    inc_path_base = normpath(join(dirname(self.basepath), value))
+                    inc_path_curdir = normpath(join(dirname(abs_path), value))
+                    inc_file = inc_path_curdir if exists(inc_path_curdir) else inc_path_base
                     if inc_file not in self.files:
                         lines = tNavigatorModelParser.read_lines(inc_file)
                         self.files[inc_file]=lines
@@ -155,20 +157,20 @@ class tNavigatorModelParser(object):
         keywords_list = []
         self.files[self.basepath] = schedule_lines
         self.__get_keywords_list(schedule_lines, '/', self.basepath, keywords_list, use_recursion=True)
-        basedir = os.path.dirname(self.basepath)
-        modelname = os.path.splitext(os.path.basename(self.basepath))[0]
-        userpath = os.path.join(basedir, 'USER')
-        if os.path.exists(userpath):            
-            for item in os.listdir(userpath):
-                userfile = os.path.join(userpath, item)
-                if os.path.isfile(userfile) and item.startswith(f'{modelname}_'): 
+        basedir = dirname(self.basepath)
+        modelname = splitext(basename(self.basepath))[0]
+        userpath = join(basedir, 'USER')
+        if exists(userpath):            
+            for item in listdir(userpath):
+                userfile = join(userpath, item)
+                if isfile(userfile) and item.startswith(f'{modelname}_'): 
                     if userfile not in self.files:
                         lines = tNavigatorModelParser.read_lines(userfile)
                         self.files = lines
                     else:
                         lines = self.files[userfile]
                     # парсим ТОЛЬКО файл пользователя (НЕ рекурсивно), подразумевая, что там нет INCLUDE
-                    self.__get_keywords_list(lines, os.path.relpath(userfile, basedir), userfile, keywords_list, use_recursion=False)   
+                    self.__get_keywords_list(lines, relpath(userfile, basedir), userfile, keywords_list, use_recursion=False)   
         return keywords_list
     
    

@@ -1,9 +1,10 @@
-from .keywords import *
+from sch_viewer.keywords import *
 from datetime import datetime
-import os
-import shutil
-import pandas as pd
+from os import getcwd, makedirs
+from os.path import basename, splitext, dirname, join, normpath, exists, abspath
+from shutil import copyfile
 import networkx as nx
+import pandas as pd
 import copy
 
 __version__ = '0.1'
@@ -47,18 +48,18 @@ class tNavigatorModel(object):
     @property
     def model_name(self):
         if self.__basepath!=None:
-            file=os.path.basename(self.__basepath)
-            return os.path.splitext(file)[0]
+            file=basename(self.__basepath)
+            return splitext(file)[0]
         else:
             return None
 
     @property
     def model_dirname(self):
         if self.__basepath!=None:
-            dir=os.path.dirname(self.__basepath)
-            return dir if dir!='' else os.getcwd()
+            dir=dirname(self.__basepath)
+            return dir if dir!='' else getcwd()
         else:
-            return os.getcwd()
+            return getcwd()
 
     @staticmethod
     def get_keyword_class(class_name: str):
@@ -219,7 +220,7 @@ class tNavigatorModel(object):
             if name.startswith('USER'):
                 return name.replace(self.model_name, new_name)
             else:
-                f=os.path.splitext(name)
+                f=splitext(name)
                 new_file = f[0] + "_" + new_name
                 if len(f)>1: 
                     new_file+=f[1]
@@ -263,10 +264,10 @@ class tNavigatorModel(object):
         now = datetime.now().strftime("%Y%m%d%H%M%S")
         for file, content in changed_files.items():
             if file != '/':
-                src_file=os.path.join(self.model_dirname, file)
+                src_file=join(self.model_dirname, file)
                 if makebackup:
-                    shutil.copyfile(src_file, f'{src_file}.{now}.back')
-                output_file = os.path.normpath(os.path.join(self.model_dirname, fnames[file]))
+                    copyfile(src_file, f'{src_file}.{now}.back')
+                output_file = normpath(join(self.model_dirname, fnames[file]))
                 with open(output_file, 'w', encoding='utf-8') as f:
                     #самый первый файл, где должна быть секция schedule, дописываем ключевые слова
                     if file == '/': 
@@ -274,9 +275,9 @@ class tNavigatorModel(object):
                     f.writelines(content)
 
         src_file = self.__basepath
-        output_file = os.path.normpath(os.path.join(self.model_dirname, new_name+".DATA"))
+        output_file = normpath(join(self.model_dirname, new_name+".DATA"))
         if makebackup:
-               shutil.copyfile(src_file, f'{src_file}.{now}.back') 
+               copyfile(src_file, f'{src_file}.{now}.back') 
 
         if '/' in changed_files:        
             content = self.schedule_kw.body + changed_files['/'] # + self.end_kw.body                
@@ -297,7 +298,7 @@ class tNavigatorModel(object):
                 if end_i>=0 and len(lines) > end_i+1:
                     f.writelines(lines[end_i+1:])
         else:
-            shutil.copyfile(src_file, output_file)
+            copyfile(src_file, output_file)
        
 
     def __get_files(self, data):
@@ -347,8 +348,8 @@ class tNavigatorModel(object):
         df: pd.DataFrame = None - при значении None экспортируется вся модель, при других значениям экспортируется переданный df ['date', 'keyword', 'body', 'include']'''
         if df is None:
             df = self.to_dataframe()
-        if not os.path.exists(os.path.dirname(os.path.abspath(path))):
-            os.makedirs(os.path.dirname(os.path.abspath(path)))
+        if not exists(dirname(abspath(path))):
+            makedirs(dirname(abspath(path)))
         writer = pd.ExcelWriter(path)
         df.to_excel(writer, index=False)
         writer.save()
