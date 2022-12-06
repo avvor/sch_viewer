@@ -1,7 +1,7 @@
+from .keywords import *
 from datetime import datetime
 import os
 import shutil
-from keywords import *
 import pandas as pd
 import networkx as nx
 import copy

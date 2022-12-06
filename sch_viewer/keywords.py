@@ -1,8 +1,8 @@
 from datetime import datetime, date, time, timedelta
 import re
+import pandas as pd
 
-import pandas
-import constants 
+import sch_viewer.tnavconstants as tnav
 
 __version__ = '0.1.1'
 
@@ -91,8 +91,8 @@ class tNavigatorKeyword(object):
 
     def get_value(self):
         '''Получить значение ключевого слова'''
-        if self.name in constants.re_pattern:
-            re_template = constants.re_pattern[self.name]
+        if self.name in tnav.re_pattern:
+            re_template = tnav.re_pattern[self.name]
             values = []
             lines = self.get_body_value_lines()
             for line in lines:
@@ -100,7 +100,7 @@ class tNavigatorKeyword(object):
                 if search:
                     values.append(search.groupdict())
             if len(values) == len(lines):   
-                return pandas.DataFrame.from_dict(values)
+                return pd.DataFrame.from_dict(values)
             else:
                 print(f'Не удалось разорать значение ключевого слова {self.name}\n{self}')
                 return None
@@ -111,7 +111,7 @@ class tNavigatorKeyword(object):
     
     def get_comment(self) -> str:
         '''Получить коментарий ключевого слова. Берется только первый коментарий, сразу после ключевого слова'''
-        search = re.search(constants.re_pattern['keyword'], self.get_body_text(), re.MULTILINE)
+        search = re.search(tnav.re_pattern['keyword'], self.get_body_text(), re.MULTILINE)
         return search.group('comment') if search else None
     
     # TODO is_correct не реализовано, должно быть переопределено в дочерних классах
@@ -135,12 +135,12 @@ class DATES(tNavigatorKeyword):
 
     def get_value(self) -> datetime:
         s = self.get_body_text_without_keyword()
-        dt = re.search(constants.re_pattern[self.name], s, re.MULTILINE)
+        dt = re.search(tnav.re_pattern[self.name], s, re.MULTILINE)
         if dt:
             day = dt.group('day')
             month = dt.group('month').upper()
             year = dt.group('year')
-            d = date(int(year), constants.months_dict[month], int(day))
+            d = date(int(year), tnav.months_dict[month], int(day))
             time_str = dt.group('time')
             t = time()
             if time_str != None: 
@@ -153,7 +153,7 @@ class DATES(tNavigatorKeyword):
     def set_value(self, date: datetime):
         def keys_with_value(dictionary, value, default=None):
             return [k for k, v in dictionary.items() if v == value]
-        self.set_body_text(f"DATES\n{date.day} '{keys_with_value(constants.months_dict, date.month)[0]}' {date.year} /\n/\n")
+        self.set_body_text(f"DATES\n{date.day} '{keys_with_value(tnav.months_dict, date.month)[0]}' {date.year} /\n/\n")
         pass
 
 '''Класс INCLUDE(tNavigatorKeyword): Описывает ключевое слово INCLUDE'''
@@ -165,7 +165,7 @@ class INCLUDE(tNavigatorKeyword):
             raise KeyError
 
     def get_value(self) -> str:
-        search = re.search(constants.re_pattern[self.name], self.get_body_text(), re.MULTILINE)
+        search = re.search(tnav.re_pattern[self.name], self.get_body_text(), re.MULTILINE)
         if search:
             return search.group('path')
         else:
@@ -174,7 +174,7 @@ class INCLUDE(tNavigatorKeyword):
 
     def set_value(self, path) -> str:
         text = self.get_body_text()
-        search = re.search(constants.re_pattern[self.name], text, re.MULTILINE)
+        search = re.search(tnav.re_pattern[self.name], text, re.MULTILINE)
         if search:
             text = text.replace(search.group('path'), path)
             self.set_body_text(text)
@@ -192,7 +192,7 @@ class TSTEP(tNavigatorKeyword):
             raise KeyError
 
     def get_value(self) -> timedelta:
-        search = re.findall(constants.re_pattern[self.name], self.get_body_text(), re.MULTILINE) 
+        search = re.findall(tnav.re_pattern[self.name], self.get_body_text(), re.MULTILINE) 
         sum = 0
         for str in search:
             days = float(str[-2])

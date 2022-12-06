@@ -1,10 +1,9 @@
 import os
 from datetime import datetime
 import re
-import os
 import chardet
-from tnavmodel import *
-import constants
+from sch_viewer.model import *
+import sch_viewer.tnavconstants as tnav
 
 __version__ = '0.1.1'
  
@@ -61,10 +60,10 @@ class tNavigatorModelParser(object):
                 # ищем стартовую дату (она одна, в файле с расширением *.DATA)
                 if re.match(r"(?i)(^\s*START)|(^\s*RESTARTDATE)", line):
                     find_start = True                
-                if find_start and re.match(constants.re_pattern['DATES'], line):
-                    start = re.search(constants.re_pattern['DATES'], line)
+                if find_start and re.match(tnav.re_pattern['DATES'], line):
+                    start = re.search(tnav.re_pattern['DATES'], line)
                     result['start'] = datetime(int(start.group('year')), 
-                                        constants.months_dict[start.group('month').upper()], 
+                                        tnav.months_dict[start.group('month').upper()], 
                                         int(start.group('day')))
                     result['file_with_start_date'] = path
                     find_start = False
@@ -73,8 +72,8 @@ class tNavigatorModelParser(object):
                 if re.match(r"(?i)^\s*INCLUDE", line): 
                     find_include = True
                 # запоминаем встречающиеся инклюды, на случай, если секции SCHEDULE не будет в файле *.DATA
-                if find_include and re.match(constants.re_pattern['INCLUDE'], line):
-                    value = re.search(constants.re_pattern['INCLUDE'], line).group('path')
+                if find_include and re.match(tnav.re_pattern['INCLUDE'], line):
+                    value = re.search(tnav.re_pattern['INCLUDE'], line).group('path')
                     inc_list.append(value)
                     find_include = False
 
@@ -122,10 +121,10 @@ class tNavigatorModelParser(object):
             keywords_list = []
         tNav_kw = None
         for line in lines:
-            re_kw = re.search(constants.re_pattern['keyword'], line)
+            re_kw = re.search(tnav.re_pattern['keyword'], line)
             if re_kw:
                 kw = re_kw.group('keyword').upper()
-                if kw in constants.keywords:
+                if kw in tnav.keywords:
                     tNav_kw_class = tNavigatorModel.get_keyword_class(kw)
                     tNav_kw = tNav_kw_class(kw, path)
                     # keywords_list.append(tNav_kw)
