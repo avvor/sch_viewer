@@ -1,11 +1,14 @@
-from sch_viewer.keywords import *
+import copy
+from typing import List, Dict
 from datetime import datetime
 from os import getcwd, makedirs
-from os.path import basename, splitext, dirname, join, normpath, exists, abspath
+from os.path import (abspath, basename, dirname, exists, join, normpath, splitext)
 from shutil import copyfile
+
 import networkx as nx
 import pandas as pd
-import copy
+
+from .keywords import *
 
 __version__ = '0.1'
 
@@ -71,22 +74,22 @@ class tNavigatorModel(object):
         return tNavigatorKeyword
 
     @property
-    def schedule_data(self):
+    def schedule_data(self) -> Dict[datetime, tNavigatorKeyword]:
         '''Данные SCHEDULE секции в виде словаря  { datetime : list of tNavigatorKeyword }'''
         return self.__sch_data
 
     @schedule_data.setter
-    def schedule_data(self, sch_data):  
+    def schedule_data(self, sch_data) -> Dict[datetime, tNavigatorKeyword]:  
         '''Данные SCHEDULE секции в виде словаря  { datetime : list of tNavigatorKeyword }'''    
         self.__sch_data = sch_data
 
     @property
-    def source_sch(self):
+    def source_sch(self) -> Dict[datetime, tNavigatorKeyword]:
         '''Исходные данные SCHEDULE секции в виде словаря (неизмененная версия)'''
         return self.__source_sch
         
     @property
-    def start(self):
+    def start(self) -> datetime:
         '''Стартовая дата модели'''
         return self.__start
 
@@ -161,7 +164,7 @@ class tNavigatorModel(object):
             graph.add_edge(kw.include_path, inc_value)
         return graph
  
-    def delete_keywords(self, date: datetime, keyword: str = None, comment: str = None) -> list:
+    def delete_keywords(self, date: datetime, keyword: str = None, comment: str = None) -> List[tNavigatorKeyword]:
         '''Удалить ключевые слова по заданным параметрам
         date: datetime - дата
         keyword: str = None - название ключевого слова
@@ -180,7 +183,7 @@ class tNavigatorModel(object):
             return [x for x in deleted if not x.immutable]
 
             
-    def find_keywords(self, date: datetime = None, keyword: str = None, comment: str = None) -> list:
+    def find_keywords(self, date: datetime = None, keyword: str = None, comment: str = None) -> List[tNavigatorKeyword]:
         '''Найти ключевые слова по заданным параметрам (вызов без параметров вернет ВСЕ ключевые слова списком)
         date: datetime = None - дата
         keyword: str = None - название ключевого слова
@@ -202,7 +205,7 @@ class tNavigatorModel(object):
     def __str__(self):
         return f"START: {self.start}\nКол-во дат: {len(self.schedule_data)}\nКол-во ключевых слов: {len(self.find_keywords())}"
 
-    def get_changed_files(self) -> dict:
+    def get_changed_files(self) -> Dict[str, List[str]]:
         src_files = self.__get_files(self.source_sch)
         dest_files = self.__get_files(self.schedule_data)
         changed_files = {}
@@ -301,8 +304,8 @@ class tNavigatorModel(object):
             copyfile(src_file, output_file)
        
 
-    def __get_files(self, data):
-        files = dict() # {имя файла: содержание файла}
+    def __get_files(self, data) -> Dict[str, List[str]]:
+        files = {} # {имя файла: содержание файла}
         for date, keywords in sorted(data.items()): 
             for kw in keywords:          
                 if kw.include_path not in files:

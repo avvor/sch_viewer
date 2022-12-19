@@ -1,11 +1,11 @@
-from sch_viewer.model import tNavigatorModel
-from sch_viewer.keywords import *
-import sch_viewer.tnavconstants as tnav
+from .model import tNavigatorModel
+from .keywords import *
+from . import tnavconstants as tnav
 
 from chardet import detect
 from os import listdir
 from os.path import basename, splitext, dirname, join, normpath, exists, relpath, isfile
-
+from typing import List, Dict
 
 __version__ = '0.1.1'
  
@@ -23,7 +23,7 @@ class tNavigatorModelParser(object):
         self.files={}
 
     @staticmethod
-    def read_lines(path: str):
+    def read_lines(path: str) -> List[str]:
         '''Прочитать значения из файла
         path: str - путь к файлу'''
         if exists(path):
@@ -46,7 +46,7 @@ class tNavigatorModelParser(object):
         else:
             return []
         
-    def find_schedule_section(self, path: str):
+    def find_schedule_section(self, path: str) -> Dict[str, List[str]]:
         '''Рекурсивный поиск секции SCHEDULE. Возвращает набор строк секции 
         (используется для определения стартовой даты и файла, в котором начинается секция SCHEDULE)
         path: str - путь к файлу, в котором осуществляется поиск'''
@@ -114,7 +114,7 @@ class tNavigatorModelParser(object):
         model = tNavigatorModel(schedule['start'], kwlist, basepath=basepath, schedule_path=schedule['file_with_schedule_section'])  
         return model         
     
-    def __get_keywords_list(self, lines: list, path: str, abs_path:str, keywords_list: list, index: int = 0, use_recursion:bool = True):
+    def __get_keywords_list(self, lines: List[str], path: str, abs_path:str, keywords_list: list, index: int = 0, use_recursion:bool = True) -> List[tNavigatorKeyword]:
         '''Получает список ключевых слов. При use_recursion = True Рекурсивно вызывается для секций INCLUDE
         lines: list - список строк, которые парсятся
         path: str - относительный пусть файлу, из которого эти строки ('' -  для первого файла)
@@ -152,7 +152,7 @@ class tNavigatorModelParser(object):
                         lines = self.files[inc_file]
                     self.__get_keywords_list(lines, value, inc_file, keywords_list, index+1)
 
-    def parse_schedule_section(self, schedule_lines):
+    def parse_schedule_section(self, schedule_lines: List[str]) -> List[tNavigatorKeyword]:
         '''Парсинг SCHEDULE секции. Возвращает список объектов ключевых слов lisf of tNavigatorKeyword'''
         keywords_list = []
         self.files[self.basepath] = schedule_lines
@@ -174,7 +174,7 @@ class tNavigatorModelParser(object):
         return keywords_list
     
    
-    def get_keywords_list(self, path: str):
+    def get_keywords_list(self, path: str) -> List[tNavigatorKeyword]:
         '''Получает список ключевых слов из файла
         paht:str - путь к файлу из которого необходимо получить ключевые слова'''
         lines =  tNavigatorModelParser.read_lines(path)
