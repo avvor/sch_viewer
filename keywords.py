@@ -3,7 +3,7 @@ from datetime import datetime, date, time, timedelta
 import re
 import pandas as pd
 
-__version__ = '0.1.1'
+__version__ = '1.0.0'
 
 class tNavigatorKeyword(object):
     '''Класс tNavigatorKeyword: Описывает одно ключевое слово  
